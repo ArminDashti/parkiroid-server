@@ -15,19 +15,25 @@ func New(applicationConfig config.Config) *gin.Engine {
 	engine := gin.New()
 	engine.Use(gin.Logger(), gin.Recovery())
 
-	sqliteStore, err := store.OpenSQLite(applicationConfig.DatabasePath)
+	sqliteStore, err := store.OpenSQLite(applicationConfig.DatabasePath, applicationConfig.RetentionPeriod)
 	if err != nil {
 		log.Fatalf("failed to open database: %v", err)
 	}
 
-	memoryStore := store.NewMemoryStore()
+	retentionCleaner := store.NewRetentionCleaner(
+		sqliteStore,
+		applicationConfig.FramesDir,
+		applicationConfig.RetentionPeriod,
+	)
+	retentionCleaner.Start()
+
 	tokenIssuer := auth.NewTokenIssuer(applicationConfig.JWTSecret, applicationConfig.TokenTTL)
 
 	authHandler := handlers.NewAuthHandler(applicationConfig.APIKey, tokenIssuer)
 	healthHandler := handlers.NewHealthHandler()
 	endpointsHandler := handlers.NewEndpointsHandler()
 	frameHandler := handlers.NewFrameHandler(sqliteStore, applicationConfig.FramesDir)
-	deviceMetricsHandler := handlers.NewDeviceMetricsHandler(memoryStore)
+	deviceMetricsHandler := handlers.NewDeviceMetricsHandler(sqliteStore)
 
 	api := engine.Group("/parkiroid/api/v1")
 	{

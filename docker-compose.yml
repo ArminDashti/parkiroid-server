@@ -1,0 +1,18 @@
+services:
+  parkiroid-server:
+    build: .
+    ports:
+      - "${PARKIROID_HOST_PORT:-8080}:8080"
+    environment:
+      PARKIROID_LISTEN_ADDRESS: ":8080"
+      PARKIROID_API_KEY: ${PARKIROID_API_KEY:-parkiroid-dev-key}
+      PARKIROID_JWT_SECRET: ${PARKIROID_JWT_SECRET:-parkiroid-dev-jwt-secret}
+      PARKIROID_TOKEN_TTL: ${PARKIROID_TOKEN_TTL:-86400}
+      PARKIROID_DATABASE_PATH: /data/parkiroid.db
+      PARKIROID_FRAMES_DIR: /data/frames
+    volumes:
+      - parkiroid-data:/data
+    restart: unless-stopped
+
+volumes:
+  parkiroid-data:

@@ -1,0 +1,6 @@
+.git
+.gitattributes
+**/*.md
+frames
+*.db
+*.db-*

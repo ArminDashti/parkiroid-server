@@ -37,7 +37,10 @@ func (handler *DeviceMetricsHandler) SubmitMetrics(context *gin.Context) {
 		ReceivedAt:     time.Now().UTC(),
 	}
 
-	handler.metricsStore.SaveMetrics(record)
+	if err := handler.metricsStore.SaveMetrics(record); err != nil {
+		context.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: "failed to save metrics"})
+		return
+	}
 
 	context.JSON(http.StatusCreated, record)
 }

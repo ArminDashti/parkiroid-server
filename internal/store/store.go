@@ -2,7 +2,6 @@ package store
 
 import (
 	"errors"
-	"sync"
 	"time"
 
 	"github.com/parkiroid/parkiroid-server/internal/models"
@@ -17,58 +16,13 @@ type FrameStore interface {
 }
 
 type MetricsStore interface {
-	SaveMetrics(metrics models.DeviceMetricsRecord)
+	SaveMetrics(metrics models.DeviceMetricsRecord) error
 	GetLatestMetrics(deviceID string) (models.DeviceMetricsRecord, error)
 }
 
-type MemoryStore struct {
-	mu      sync.RWMutex
-	frames  map[string]models.FrameRecord
-	metrics map[string]models.DeviceMetricsRecord
-}
-
-func NewMemoryStore() *MemoryStore {
-	return &MemoryStore{
-		frames:  make(map[string]models.FrameRecord),
-		metrics: make(map[string]models.DeviceMetricsRecord),
-	}
-}
-
-func (store *MemoryStore) SaveFrame(frame models.FrameRecord) error {
-	store.mu.Lock()
-	defer store.mu.Unlock()
-	store.frames[frame.DeviceID] = frame
-	return nil
-}
-
-func (store *MemoryStore) GetLastFrame(deviceID string) (models.FrameRecord, error) {
-	store.mu.RLock()
-	defer store.mu.RUnlock()
-
-	frame, exists := store.frames[deviceID]
-	if !exists {
-		return models.FrameRecord{}, ErrFrameNotFound
-	}
-
-	return frame, nil
-}
-
-func (store *MemoryStore) SaveMetrics(metrics models.DeviceMetricsRecord) {
-	store.mu.Lock()
-	defer store.mu.Unlock()
-	store.metrics[metrics.DeviceID] = metrics
-}
-
-func (store *MemoryStore) GetLatestMetrics(deviceID string) (models.DeviceMetricsRecord, error) {
-	store.mu.RLock()
-	defer store.mu.RUnlock()
-
-	metrics, exists := store.metrics[deviceID]
-	if !exists {
-		return models.DeviceMetricsRecord{}, ErrMetricsNotFound
-	}
-
-	return metrics, nil
+type RetentionStore interface {
+	PurgeExpiredFrames(cutoff time.Time) ([]string, error)
+	PurgeExpiredMetrics(cutoff time.Time) error
 }
 
 func NormalizeCapturedAt(capturedAt time.Time) time.Time {
