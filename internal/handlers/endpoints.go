@@ -20,7 +20,7 @@ func (handler *EndpointsHandler) ListEndpoints(context *gin.Context) {
 		{
 			Method:      http.MethodPost,
 			Path:        apiBasePath + "/auth",
-			Description: "Exchange API key for a bearer token",
+			Description: "Exchange admin credentials for a bearer token",
 			Auth:        false,
 		},
 		{
@@ -57,6 +57,12 @@ func (handler *EndpointsHandler) ListEndpoints(context *gin.Context) {
 			Method:      http.MethodPost,
 			Path:        apiBasePath + "/device-metrics",
 			Description: "Submit device telemetry metrics",
+			Auth:        true,
+		},
+		{
+			Method:      http.MethodPost,
+			Path:        apiBasePath + "/streaming/token",
+			Description: "Issue a LiveKit access token for WebRTC streaming",
 			Auth:        true,
 		},
 	}

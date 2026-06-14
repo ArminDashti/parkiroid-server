@@ -7,34 +7,43 @@ import (
 )
 
 const (
-	defaultListenAddress  = ":8080"
-	defaultAPIKey         = "parkiroid-dev-key"
-	defaultJWTSecret      = "parkiroid-dev-jwt-secret"
-	defaultTokenTTL       = 24 * time.Hour
-	defaultDatabasePath   = "parkiroid.db"
-	defaultFramesDir      = "frames"
-	defaultRetentionDays  = 7
+	defaultListenAddress     = ":8080"
+	defaultJWTSecret         = "parkiroid-dev-jwt-secret"
+	defaultTokenTTL          = 24 * time.Hour
+	defaultDatabasePath      = "parkiroid.db"
+	defaultFramesDir         = "frames"
+	defaultRetentionDays     = 7
+	defaultLiveKitURL        = "ws://localhost:7880"
+	defaultLiveKitAPIKey     = "devkey"
+	defaultLiveKitAPISecret  = "secret"
+	defaultLiveKitTokenTTL   = time.Hour
 )
 
 type Config struct {
 	ListenAddress   string
-	APIKey          string
 	JWTSecret       string
 	TokenTTL        time.Duration
 	DatabasePath    string
 	FramesDir       string
 	RetentionPeriod time.Duration
+	LiveKitURL      string
+	LiveKitAPIKey   string
+	LiveKitAPISecret string
+	LiveKitTokenTTL time.Duration
 }
 
 func Load() Config {
 	return Config{
-		ListenAddress:   envOrDefault("PARKIROID_LISTEN_ADDRESS", defaultListenAddress),
-		APIKey:          envOrDefault("PARKIROID_API_KEY", defaultAPIKey),
-		JWTSecret:       envOrDefault("PARKIROID_JWT_SECRET", defaultJWTSecret),
-		TokenTTL:        envDurationOrDefault("PARKIROID_TOKEN_TTL", defaultTokenTTL),
-		DatabasePath:    envOrDefault("PARKIROID_DATABASE_PATH", defaultDatabasePath),
-		FramesDir:       envOrDefault("PARKIROID_FRAMES_DIR", defaultFramesDir),
-		RetentionPeriod: envDaysOrDefault("PARKIROID_RETENTION_DAYS", defaultRetentionDays),
+		ListenAddress:    envOrDefault("PARKIROID_LISTEN_ADDRESS", defaultListenAddress),
+		JWTSecret:        envOrDefault("PARKIROID_JWT_SECRET", defaultJWTSecret),
+		TokenTTL:         envDurationOrDefault("PARKIROID_TOKEN_TTL", defaultTokenTTL),
+		DatabasePath:     envOrDefault("PARKIROID_DATABASE_PATH", defaultDatabasePath),
+		FramesDir:        envOrDefault("PARKIROID_FRAMES_DIR", defaultFramesDir),
+		RetentionPeriod:  envDaysOrDefault("PARKIROID_RETENTION_DAYS", defaultRetentionDays),
+		LiveKitURL:       envOrDefault("PARKIROID_LIVEKIT_URL", defaultLiveKitURL),
+		LiveKitAPIKey:    envOrDefault("PARKIROID_LIVEKIT_API_KEY", defaultLiveKitAPIKey),
+		LiveKitAPISecret: envOrDefault("PARKIROID_LIVEKIT_API_SECRET", defaultLiveKitAPISecret),
+		LiveKitTokenTTL:  envDurationOrDefault("PARKIROID_LIVEKIT_TOKEN_TTL", defaultLiveKitTokenTTL),
 	}
 }
 

@@ -16,7 +16,7 @@ Protected endpoints require a bearer token obtained from `POST /auth`.
 Authorization: Bearer <token>
 ```
 
-Obtain a token by exchanging the API key (`PARKIROID_API_KEY`, default: `parkiroid-dev-key`).
+Obtain a token by posting admin credentials to `POST /auth`. The server verifies a single hardcoded account (`admin` / `parkiroid-dev-password` in development). Replace the bcrypt hash in `internal/auth/credentials.go` for production.
 
 ---
 
@@ -24,7 +24,7 @@ Obtain a token by exchanging the API key (`PARKIROID_API_KEY`, default: `parkiro
 
 ### POST `/parkiroid/api/v1/auth`
 
-Exchange API key for a bearer token.
+Exchange admin credentials for a bearer token.
 
 **Auth required:** No
 
@@ -32,7 +32,8 @@ Exchange API key for a bearer token.
 
 ```json
 {
-  "api_key": "parkiroid-dev-key"
+  "username": "admin",
+  "password": "parkiroid-dev-password"
 }
 ```
 
@@ -50,7 +51,7 @@ Exchange API key for a bearer token.
 | Status | Error |
 |--------|-------|
 | `400` | `invalid request body` |
-| `401` | `invalid api key` |
+| `401` | `invalid username or password` |
 | `500` | `failed to issue token` |
 
 ---
@@ -69,7 +70,7 @@ List all available API endpoints.
     {
       "method": "POST",
       "path": "/parkiroid/api/v1/auth",
-      "description": "Exchange API key for a bearer token",
+      "description": "Exchange admin credentials for a bearer token",
       "auth_required": false
     },
     {
@@ -106,6 +107,12 @@ List all available API endpoints.
       "method": "POST",
       "path": "/parkiroid/api/v1/device-metrics",
       "description": "Submit device telemetry metrics",
+      "auth_required": true
+    },
+    {
+      "method": "POST",
+      "path": "/parkiroid/api/v1/streaming/token",
+      "description": "Issue a LiveKit access token for WebRTC streaming",
       "auth_required": true
     }
   ]
@@ -309,14 +316,74 @@ Retrieve the latest metrics for a device.
 
 ---
 
+### POST `/parkiroid/api/v1/streaming/token`
+
+Issue a LiveKit access token for WebRTC streaming to or from a device room.
+
+Each device maps to a LiveKit room named `device-{sanitized-device-id}`. Devices publish video with role `publisher`; viewers subscribe with role `subscriber`.
+
+**Auth required:** Yes
+
+**Request body:**
+
+```json
+{
+  "device_id": "aa:bb:cc:dd:ee:ff",
+  "identity": "viewer-1",
+  "role": "subscriber"
+}
+```
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `device_id` | Yes | Device identifier (MAC address, device name, or numeric ID) |
+| `identity` | No | LiveKit participant identity. Defaults to `publisher-{device-id}` or `subscriber-{device-id}` based on role |
+| `role` | No | `publisher` (can publish tracks) or `subscriber` (subscribe only). Defaults to `subscriber` |
+
+**Success response:** `200 OK`
+
+```json
+{
+  "token": "<livekit-jwt>",
+  "url": "ws://localhost:7880",
+  "room": "device-aa-bb-cc-dd-ee-ff",
+  "identity": "subscriber-aa-bb-cc-dd-ee-ff",
+  "expires_at": "2026-06-13T13:00:00Z"
+}
+```
+
+Use `url`, `token`, and `room` with a LiveKit client SDK to connect.
+
+**Error responses:**
+
+| Status | Error |
+|--------|-------|
+| `400` | `invalid request body` |
+| `400` | `role must be publisher or subscriber` |
+| `401` | `missing authorization header` / `invalid authorization header format` / `invalid or expired token` |
+| `503` | `livekit is not configured` |
+| `500` | `failed to issue livekit token` |
+
+**Environment variables:**
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `PARKIROID_LIVEKIT_URL` | `ws://localhost:7880` | WebSocket URL returned to clients |
+| `PARKIROID_LIVEKIT_API_KEY` | `devkey` | LiveKit API key |
+| `PARKIROID_LIVEKIT_API_SECRET` | `secret` | LiveKit API secret |
+| `PARKIROID_LIVEKIT_TOKEN_TTL` | `3600` | LiveKit token lifetime in seconds |
+
+---
+
 ## Summary
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| `POST` | `/parkiroid/api/v1/auth` | No | Exchange API key for a bearer token |
+| `POST` | `/parkiroid/api/v1/auth` | No | Exchange admin credentials for a bearer token |
 | `GET` | `/parkiroid/api/v1/endpoints` | No | List available API endpoints |
 | `GET` | `/parkiroid/api/v1/health` | No | Service health check |
 | `POST` | `/parkiroid/api/v1/frame` | Yes | Submit a camera frame from a device |
 | `GET` | `/parkiroid/api/v1/last-frame` | Yes | Retrieve the most recent frame for a device |
 | `POST` | `/parkiroid/api/v1/device-metrics` | Yes | Submit device telemetry metrics |
 | `GET` | `/parkiroid/api/v1/device-metrics` | Yes | Retrieve the latest metrics for a device |
+| `POST` | `/parkiroid/api/v1/streaming/token` | Yes | Issue a LiveKit access token for WebRTC streaming |

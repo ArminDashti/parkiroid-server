@@ -9,13 +9,11 @@ import (
 )
 
 type AuthHandler struct {
-	apiKey       string
-	tokenIssuer  *auth.TokenIssuer
+	tokenIssuer *auth.TokenIssuer
 }
 
-func NewAuthHandler(apiKey string, tokenIssuer *auth.TokenIssuer) *AuthHandler {
+func NewAuthHandler(tokenIssuer *auth.TokenIssuer) *AuthHandler {
 	return &AuthHandler{
-		apiKey:      apiKey,
 		tokenIssuer: tokenIssuer,
 	}
 }
@@ -27,12 +25,12 @@ func (handler *AuthHandler) Authenticate(context *gin.Context) {
 		return
 	}
 
-	if request.APIKey != handler.apiKey {
-		context.JSON(http.StatusUnauthorized, models.ErrorResponse{Error: "invalid api key"})
+	if !auth.VerifyAdminCredentials(request.Username, request.Password) {
+		context.JSON(http.StatusUnauthorized, models.ErrorResponse{Error: "invalid username or password"})
 		return
 	}
 
-	token, expiresAt, err := handler.tokenIssuer.IssueToken("parkiroid-client")
+	token, expiresAt, err := handler.tokenIssuer.IssueToken(auth.AdminUsername)
 	if err != nil {
 		context.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: "failed to issue token"})
 		return

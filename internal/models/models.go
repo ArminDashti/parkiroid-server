@@ -3,7 +3,8 @@ package models
 import "time"
 
 type AuthRequest struct {
-	APIKey string `json:"api_key" binding:"required"`
+	Username string `json:"username" binding:"required"`
+	Password string `json:"password" binding:"required"`
 }
 
 type AuthResponse struct {
@@ -65,6 +66,20 @@ type DeviceMetricsRecord struct {
 	SignalStrength *int      `json:"signal_strength_dbm,omitempty"`
 	RecordedAt     time.Time `json:"recorded_at"`
 	ReceivedAt     time.Time `json:"received_at"`
+}
+
+type LiveKitTokenRequest struct {
+	DeviceID string `json:"device_id" binding:"required"`
+	Identity string `json:"identity"`
+	Role     string `json:"role"`
+}
+
+type LiveKitTokenResponse struct {
+	Token     string    `json:"token"`
+	URL       string    `json:"url"`
+	Room      string    `json:"room"`
+	Identity  string    `json:"identity"`
+	ExpiresAt time.Time `json:"expires_at"`
 }
 
 type ErrorResponse struct {
