@@ -10,13 +10,27 @@ Default listen address: `:8080` (configurable via `PARKIROID_LISTEN_ADDRESS`)
 
 Public endpoints do not require a token.
 
-Protected endpoints require a bearer token obtained from `POST /auth`.
+Protected endpoints require a bearer token.
 
 ```
 Authorization: Bearer <token>
 ```
 
-Obtain a token by posting admin credentials to `POST /auth`. The server verifies a single hardcoded account (`admin` / `parkiroid-dev-password` in development). Replace the bcrypt hash in `internal/auth/credentials.go` for production.
+Two token types are accepted:
+
+1. **Embedded API token** (recommended for client apps) — a static token configured on the server via `PARKIROID_EMBEDDED_API_TOKEN`. Embed the same value in your app. Development default:
+
+   ```
+   pk_dev_a8f3c2e1b9d74f6a0e5c3b9d2f7a1e4c8b6d0f3a7e2c9b5d1f8a4e6c0b3d7f9
+   ```
+
+   Generate a production token with:
+
+   ```bash
+   go run ./cmd/issue-token
+   ```
+
+2. **JWT from `POST /auth`** — short-lived admin token obtained by posting credentials. The server verifies a single hardcoded account (`admin` / `parkiroid-dev-password` in development). Replace the bcrypt hash in `internal/auth/credentials.go` for production.
 
 ---
 

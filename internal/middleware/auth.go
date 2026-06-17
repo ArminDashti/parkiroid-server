@@ -9,7 +9,7 @@ import (
 	"github.com/parkiroid/parkiroid-server/internal/models"
 )
 
-func RequireBearerToken(tokenIssuer *auth.TokenIssuer) gin.HandlerFunc {
+func RequireBearerToken(tokenIssuer *auth.TokenIssuer, embeddedAPIToken string) gin.HandlerFunc {
 	return func(context *gin.Context) {
 		authorizationHeader := context.GetHeader("Authorization")
 		if authorizationHeader == "" {
@@ -27,7 +27,7 @@ func RequireBearerToken(tokenIssuer *auth.TokenIssuer) gin.HandlerFunc {
 			return
 		}
 
-		if err := tokenIssuer.ValidateToken(parts[1]); err != nil {
+		if err := auth.ValidateBearerToken(parts[1], tokenIssuer, embeddedAPIToken); err != nil {
 			context.AbortWithStatusJSON(http.StatusUnauthorized, models.ErrorResponse{
 				Error: "invalid or expired token",
 			})

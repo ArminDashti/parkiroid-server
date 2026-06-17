@@ -12,9 +12,18 @@ docker compose up --build
 
 The API listens on port `8080` by default. LiveKit listens on port `7880`. Override host ports with `PARKIROID_HOST_PORT` and `LIVEKIT_HOST_PORT`.
 
+Generate an embedded API token for client apps:
+
+```bash
+go run ./cmd/issue-token
+```
+
+Set the same value in your app and on the server as `PARKIROID_EMBEDDED_API_TOKEN`.
+
 Set secrets for production:
 
 ```bash
+export PARKIROID_EMBEDDED_API_TOKEN=your-embedded-api-token
 export PARKIROID_JWT_SECRET=your-jwt-secret
 export PARKIROID_LIVEKIT_API_KEY=your-livekit-api-key
 export PARKIROID_LIVEKIT_API_SECRET=your-livekit-api-secret

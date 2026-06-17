@@ -50,7 +50,7 @@ func New(applicationConfig config.Config) *gin.Engine {
 		api.GET("/health", healthHandler.GetHealth)
 
 		protected := api.Group("/")
-		protected.Use(middleware.RequireBearerToken(tokenIssuer))
+		protected.Use(middleware.RequireBearerToken(tokenIssuer, applicationConfig.EmbeddedAPIToken))
 		{
 			protected.GET("/last-frame", frameHandler.GetLastFrame)
 			protected.POST("/frame", frameHandler.SubmitFrame)

@@ -1,0 +1,75 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
+
+IMAGE_NAME="parkiroid-server"
+IMAGE_TAG="latest"
+OUTPUT_FILE=""
+
+usage() {
+  cat <<EOF
+Usage: $(basename "$0") [options]
+
+Build the parkiroid-server Docker image and export it to a tar archive.
+
+Options:
+  -n, --name NAME    Image name (default: parkiroid-server)
+  -t, --tag TAG      Image tag (default: latest)
+  -o, --output FILE  Output tar file (default: <name>-<tag>.tar)
+  -h, --help         Show this help message
+
+Environment variables:
+  IMAGE_NAME, IMAGE_TAG, OUTPUT_FILE override the defaults above.
+
+Examples:
+  $(basename "$0")
+  $(basename "$0") -t v1.0.0 -o parkiroid-server-v1.0.0.tar
+EOF
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -n|--name)
+      IMAGE_NAME="$2"
+      shift 2
+      ;;
+    -t|--tag)
+      IMAGE_TAG="$2"
+      shift 2
+      ;;
+    -o|--output)
+      OUTPUT_FILE="$2"
+      shift 2
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "Unknown option: $1" >&2
+      usage >&2
+      exit 1
+      ;;
+  esac
+done
+
+IMAGE_NAME="${IMAGE_NAME:-parkiroid-server}"
+IMAGE_TAG="${IMAGE_TAG:-latest}"
+OUTPUT_FILE="${OUTPUT_FILE:-${IMAGE_NAME}-${IMAGE_TAG}.tar}"
+FULL_IMAGE="${IMAGE_NAME}:${IMAGE_TAG}"
+
+if ! command -v docker >/dev/null 2>&1; then
+  echo "Error: docker is not installed or not on PATH." >&2
+  exit 1
+fi
+
+echo "Building Docker image ${FULL_IMAGE}..."
+docker build -t "${FULL_IMAGE}" .
+
+echo "Exporting image to ${OUTPUT_FILE}..."
+docker save -o "${OUTPUT_FILE}" "${FULL_IMAGE}"
+
+echo "Done. Load on another host with:"
+echo "  docker load -i ${OUTPUT_FILE}"
