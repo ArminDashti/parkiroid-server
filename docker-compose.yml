@@ -1,4 +1,12 @@
 services:
+  agent-export:
+    build: ./docker/agent-export
+    ports:
+      - "${AGENT_EXPORT_HOST_PORT:-2030}:2030"
+    volumes:
+      - ./agent-exports:/exports
+    restart: unless-stopped
+
   livekit:
     image: livekit/livekit-server:latest
     command: --config /etc/livekit.yaml
