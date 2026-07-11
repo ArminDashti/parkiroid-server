@@ -1,39 +1,90 @@
 package store
 
 const schemaDDL = `
-PRAGMA foreign_keys = ON;
-
 CREATE TABLE IF NOT EXISTS devices (
-	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	id BIGSERIAL PRIMARY KEY,
 	device_name TEXT NOT NULL,
 	mac_address TEXT NOT NULL UNIQUE
 );
 
-CREATE TABLE IF NOT EXISTS frames (
-	id INTEGER PRIMARY KEY AUTOINCREMENT,
+CREATE TABLE IF NOT EXISTS login_logs (
+	id BIGSERIAL PRIMARY KEY,
+	ip TEXT NOT NULL,
+	username TEXT NOT NULL,
+	browser_info TEXT NOT NULL DEFAULT '',
+	attempted_at TIMESTAMPTZ NOT NULL,
+	success BOOLEAN NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_login_logs_attempted_at ON login_logs (attempted_at DESC);
+
+CREATE TABLE IF NOT EXISTS stored_images (
+	id BIGSERIAL PRIMARY KEY,
+	device_id BIGINT NOT NULL REFERENCES devices(id),
 	path TEXT NOT NULL,
-	device_id INTEGER NOT NULL,
-	captured_at TEXT NOT NULL,
-	FOREIGN KEY (device_id) REFERENCES devices(id)
+	captured_at TIMESTAMPTZ NOT NULL,
+	received_at TIMESTAMPTZ NOT NULL
 );
 
-CREATE INDEX IF NOT EXISTS idx_frames_device_captured_at
-	ON frames (device_id, captured_at DESC);
+CREATE INDEX IF NOT EXISTS idx_stored_images_device_captured_at
+	ON stored_images (device_id, captured_at DESC);
 
-CREATE TABLE IF NOT EXISTS device_metrics (
-	id INTEGER PRIMARY KEY AUTOINCREMENT,
-	device_id INTEGER NOT NULL,
-	cpu_usage REAL NOT NULL,
-	memory_usage REAL NOT NULL,
-	disk_usage REAL NOT NULL,
-	battery_level REAL,
-	temperature_c REAL,
+CREATE TABLE IF NOT EXISTS phone_actions (
+	id BIGSERIAL PRIMARY KEY,
+	device_id BIGINT NOT NULL REFERENCES devices(id),
+	action_type TEXT NOT NULL,
+	payload JSONB NOT NULL DEFAULT '{}',
+	sent_at TIMESTAMPTZ NOT NULL,
+	status TEXT NOT NULL DEFAULT 'pending'
+);
+
+CREATE INDEX IF NOT EXISTS idx_phone_actions_device_status
+	ON phone_actions (device_id, status, sent_at DESC);
+
+CREATE TABLE IF NOT EXISTS webrtc_connections (
+	id BIGSERIAL PRIMARY KEY,
+	device_id BIGINT NOT NULL REFERENCES devices(id),
+	room TEXT NOT NULL,
+	identity TEXT NOT NULL,
+	role TEXT NOT NULL,
+	connected_at TIMESTAMPTZ NOT NULL,
+	disconnected_at TIMESTAMPTZ,
+	status TEXT NOT NULL DEFAULT 'active'
+);
+
+CREATE INDEX IF NOT EXISTS idx_webrtc_connections_device_connected_at
+	ON webrtc_connections (device_id, connected_at DESC);
+
+CREATE TABLE IF NOT EXISTS app_settings (
+	id BIGSERIAL PRIMARY KEY,
+	platform TEXT NOT NULL,
+	key TEXT NOT NULL,
+	value TEXT NOT NULL,
+	updated_at TIMESTAMPTZ NOT NULL,
+	UNIQUE (platform, key)
+);
+
+CREATE TABLE IF NOT EXISTS ai_model_paths (
+	id BIGSERIAL PRIMARY KEY,
+	model_name TEXT NOT NULL UNIQUE,
+	path TEXT NOT NULL,
+	version TEXT NOT NULL DEFAULT '',
+	updated_at TIMESTAMPTZ NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS android_telemetry (
+	id BIGSERIAL PRIMARY KEY,
+	device_id BIGINT NOT NULL REFERENCES devices(id),
+	battery_level DOUBLE PRECISION,
 	signal_strength INTEGER,
-	recorded_at TEXT NOT NULL,
-	received_at TEXT NOT NULL,
-	FOREIGN KEY (device_id) REFERENCES devices(id)
+	network_type TEXT,
+	temperature_c DOUBLE PRECISION,
+	latitude DOUBLE PRECISION,
+	longitude DOUBLE PRECISION,
+	recorded_at TIMESTAMPTZ NOT NULL,
+	received_at TIMESTAMPTZ NOT NULL
 );
 
-CREATE INDEX IF NOT EXISTS idx_device_metrics_device_recorded_at
-	ON device_metrics (device_id, recorded_at DESC);
+CREATE INDEX IF NOT EXISTS idx_android_telemetry_device_recorded_at
+	ON android_telemetry (device_id, recorded_at DESC);
 `

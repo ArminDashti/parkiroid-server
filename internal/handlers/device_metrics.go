@@ -5,9 +5,9 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/dogan/dogan-server/internal/models"
+	"github.com/dogan/dogan-server/internal/store"
 	"github.com/gin-gonic/gin"
-	"github.com/parkiroid/parkiroid-server/internal/models"
-	"github.com/parkiroid/parkiroid-server/internal/store"
 )
 
 type DeviceMetricsHandler struct {
@@ -27,12 +27,12 @@ func (handler *DeviceMetricsHandler) SubmitMetrics(context *gin.Context) {
 
 	record := models.DeviceMetricsRecord{
 		DeviceID:       payload.DeviceID,
-		CPUUsage:       payload.CPUUsage,
-		MemoryUsage:    payload.MemoryUsage,
-		DiskUsage:      payload.DiskUsage,
 		BatteryLevel:   payload.BatteryLevel,
-		TemperatureC:   payload.TemperatureC,
 		SignalStrength: payload.SignalStrength,
+		NetworkType:    payload.NetworkType,
+		TemperatureC:   payload.TemperatureC,
+		Latitude:       payload.Latitude,
+		Longitude:      payload.Longitude,
 		RecordedAt:     store.NormalizeRecordedAt(payload.RecordedAt),
 		ReceivedAt:     time.Now().UTC(),
 	}

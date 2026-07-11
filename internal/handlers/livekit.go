@@ -3,18 +3,24 @@ package handlers
 import (
 	"errors"
 	"net/http"
+	"time"
 
+	livekitauth "github.com/dogan/dogan-server/internal/livekit"
+	"github.com/dogan/dogan-server/internal/models"
+	"github.com/dogan/dogan-server/internal/store"
 	"github.com/gin-gonic/gin"
-	livekitauth "github.com/parkiroid/parkiroid-server/internal/livekit"
-	"github.com/parkiroid/parkiroid-server/internal/models"
 )
 
 type LiveKitHandler struct {
 	tokenIssuer *livekitauth.TokenIssuer
+	webrtcStore store.WebRTCStore
 }
 
-func NewLiveKitHandler(tokenIssuer *livekitauth.TokenIssuer) *LiveKitHandler {
-	return &LiveKitHandler{tokenIssuer: tokenIssuer}
+func NewLiveKitHandler(tokenIssuer *livekitauth.TokenIssuer, webrtcStore store.WebRTCStore) *LiveKitHandler {
+	return &LiveKitHandler{
+		tokenIssuer: tokenIssuer,
+		webrtcStore: webrtcStore,
+	}
 }
 
 func (handler *LiveKitHandler) IssueToken(context *gin.Context) {
@@ -44,6 +50,15 @@ func (handler *LiveKitHandler) IssueToken(context *gin.Context) {
 		return
 	}
 
+	_, _ = handler.webrtcStore.SaveConnection(models.WebRTCConnectionRecord{
+		DeviceID:    request.DeviceID,
+		Room:        tokenResponse.Room,
+		Identity:    tokenResponse.Identity,
+		Role:        defaultRole(request.Role),
+		ConnectedAt: time.Now().UTC(),
+		Status:      "active",
+	})
+
 	context.JSON(http.StatusOK, models.LiveKitTokenResponse{
 		Token:     tokenResponse.Token,
 		URL:       tokenResponse.URL,
@@ -51,4 +66,11 @@ func (handler *LiveKitHandler) IssueToken(context *gin.Context) {
 		Identity:  tokenResponse.Identity,
 		ExpiresAt: tokenResponse.ExpiresAt,
 	})
+}
+
+func defaultRole(role string) string {
+	if role == "" {
+		return livekitauth.RoleSubscriber
+	}
+	return role
 }

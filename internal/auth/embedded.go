@@ -8,8 +8,7 @@ import (
 )
 
 const (
-	// DefaultEmbeddedAPIToken is the development embedded token. Replace in production.
-	DefaultEmbeddedAPIToken = "pk_dev_a8f3c2e1b9d74f6a0e5c3b9d2f7a1e4c8b6d0f3a7e2c9b5d1f8a4e6c0b3d7f9"
+	DefaultEmbeddedAPIToken = "dg_dev_a8f3c2e1b9d74f6a0e5c3b9d2f7a1e4c8b6d0f3a7e2c9b5d1f8a4e6c0b3d7f9"
 )
 
 func ValidateBearerToken(tokenString string, tokenIssuer *TokenIssuer, embeddedAPIToken string) error {
@@ -26,5 +25,5 @@ func GenerateEmbeddedAPIToken() (string, error) {
 		return "", fmt.Errorf("generate embedded api token: %w", err)
 	}
 
-	return "pk_" + hex.EncodeToString(randomBytes), nil
+	return "dg_" + hex.EncodeToString(randomBytes), nil
 }

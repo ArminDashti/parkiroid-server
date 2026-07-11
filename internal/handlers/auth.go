@@ -3,18 +3,21 @@ package handlers
 import (
 	"net/http"
 
+	"github.com/dogan/dogan-server/internal/auth"
+	"github.com/dogan/dogan-server/internal/models"
+	"github.com/dogan/dogan-server/internal/store"
 	"github.com/gin-gonic/gin"
-	"github.com/parkiroid/parkiroid-server/internal/auth"
-	"github.com/parkiroid/parkiroid-server/internal/models"
 )
 
 type AuthHandler struct {
-	tokenIssuer *auth.TokenIssuer
+	tokenIssuer   *auth.TokenIssuer
+	loginLogStore store.LoginLogStore
 }
 
-func NewAuthHandler(tokenIssuer *auth.TokenIssuer) *AuthHandler {
+func NewAuthHandler(tokenIssuer *auth.TokenIssuer, loginLogStore store.LoginLogStore) *AuthHandler {
 	return &AuthHandler{
-		tokenIssuer: tokenIssuer,
+		tokenIssuer:   tokenIssuer,
+		loginLogStore: loginLogStore,
 	}
 }
 
@@ -25,7 +28,16 @@ func (handler *AuthHandler) Authenticate(context *gin.Context) {
 		return
 	}
 
-	if !auth.VerifyAdminCredentials(request.Username, request.Password) {
+	clientIP := context.ClientIP()
+	browserInfo := context.GetHeader("User-Agent")
+	success := auth.VerifyAdminCredentials(request.Username, request.Password)
+
+	if err := handler.loginLogStore.SaveLoginLog(clientIP, request.Username, browserInfo, success); err != nil {
+		context.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: "failed to save login log"})
+		return
+	}
+
+	if !success {
 		context.JSON(http.StatusUnauthorized, models.ErrorResponse{Error: "invalid username or password"})
 		return
 	}

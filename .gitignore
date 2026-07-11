@@ -1,5 +1,5 @@
 frames/
-agent-exports/*
-!agent-exports/.gitkeep
 *.db
 *.db-*
+armin-credentials.txt
+.deploy/

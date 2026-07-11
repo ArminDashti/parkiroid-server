@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/parkiroid/parkiroid-server/internal/models"
+	"github.com/dogan/dogan-server/internal/models"
 )
 
 type HealthHandler struct{}

@@ -1,10 +1,19 @@
 services:
-  agent-export:
-    build: ./docker/agent-export
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: dogan
+      POSTGRES_USER: dogan
+      POSTGRES_PASSWORD: dogan
     ports:
-      - "${AGENT_EXPORT_HOST_PORT:-2030}:2030"
+      - "${POSTGRES_HOST_PORT:-5432}:5432"
     volumes:
-      - ./agent-exports:/exports
+      - dogan-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dogan -d dogan"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
     restart: unless-stopped
 
   livekit:
@@ -18,26 +27,33 @@ services:
       - ./livekit.yaml:/etc/livekit.yaml:ro
     restart: unless-stopped
 
-  parkiroid-server:
-    build: .
+  dogan-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: dogan-server:latest
     depends_on:
-      - livekit
+      postgres:
+        condition: service_healthy
+      livekit:
+        condition: service_started
     ports:
-      - "${PARKIROID_HOST_PORT:-8080}:8080"
+      - "${DOGAN_HOST_PORT:-8080}:8080"
     environment:
-      PARKIROID_LISTEN_ADDRESS: ":8080"
-      PARKIROID_EMBEDDED_API_TOKEN: ${PARKIROID_EMBEDDED_API_TOKEN:-pk_dev_a8f3c2e1b9d74f6a0e5c3b9d2f7a1e4c8b6d0f3a7e2c9b5d1f8a4e6c0b3d7f9}
-      PARKIROID_JWT_SECRET: ${PARKIROID_JWT_SECRET:-parkiroid-dev-jwt-secret}
-      PARKIROID_TOKEN_TTL: ${PARKIROID_TOKEN_TTL:-86400}
-      PARKIROID_DATABASE_PATH: /data/parkiroid.db
-      PARKIROID_FRAMES_DIR: /data/frames
-      PARKIROID_LIVEKIT_URL: ${PARKIROID_LIVEKIT_URL:-ws://localhost:7880}
-      PARKIROID_LIVEKIT_API_KEY: ${PARKIROID_LIVEKIT_API_KEY:-devkey}
-      PARKIROID_LIVEKIT_API_SECRET: ${PARKIROID_LIVEKIT_API_SECRET:-secret}
-      PARKIROID_LIVEKIT_TOKEN_TTL: ${PARKIROID_LIVEKIT_TOKEN_TTL:-3600}
+      DOGAN_LISTEN_ADDRESS: ":8080"
+      DOGAN_EMBEDDED_API_TOKEN: ${DOGAN_EMBEDDED_API_TOKEN:-dg_dev_a8f3c2e1b9d74f6a0e5c3b9d2f7a1e4c8b6d0f3a7e2c9b5d1f8a4e6c0b3d7f9}
+      DOGAN_JWT_SECRET: ${DOGAN_JWT_SECRET:-dogan-dev-jwt-secret}
+      DOGAN_TOKEN_TTL: ${DOGAN_TOKEN_TTL:-86400}
+      DOGAN_DATABASE_URL: postgres://dogan:dogan@postgres:5432/dogan?sslmode=disable
+      DOGAN_FRAMES_DIR: /data/frames
+      DOGAN_LIVEKIT_URL: ${DOGAN_LIVEKIT_URL:-ws://livekit:7880}
+      DOGAN_LIVEKIT_API_KEY: ${DOGAN_LIVEKIT_API_KEY:-devkey}
+      DOGAN_LIVEKIT_API_SECRET: ${DOGAN_LIVEKIT_API_SECRET:-secret}
+      DOGAN_LIVEKIT_TOKEN_TTL: ${DOGAN_LIVEKIT_TOKEN_TTL:-3600}
     volumes:
-      - parkiroid-data:/data
+      - dogan-data:/data
     restart: unless-stopped
 
 volumes:
-  parkiroid-data:
+  dogan-postgres-data:
+  dogan-data:
