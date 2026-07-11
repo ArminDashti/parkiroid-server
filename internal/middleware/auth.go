@@ -5,8 +5,8 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	"github.com/parkiroid/parkiroid-server/internal/auth"
-	"github.com/parkiroid/parkiroid-server/internal/models"
+	"github.com/dogan/dogan-server/internal/auth"
+	"github.com/dogan/dogan-server/internal/models"
 )
 
 func RequireBearerToken(tokenIssuer *auth.TokenIssuer, embeddedAPIToken string) gin.HandlerFunc {

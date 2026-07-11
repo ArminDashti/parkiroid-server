@@ -3,11 +3,12 @@ package handlers
 import (
 	"errors"
 	"net/http"
+	"os"
 	"time"
 
+	"github.com/dogan/dogan-server/internal/models"
+	"github.com/dogan/dogan-server/internal/store"
 	"github.com/gin-gonic/gin"
-	"github.com/parkiroid/parkiroid-server/internal/models"
-	"github.com/parkiroid/parkiroid-server/internal/store"
 )
 
 type FrameHandler struct {
@@ -66,4 +67,33 @@ func (handler *FrameHandler) GetLastFrame(context *gin.Context) {
 	}
 
 	context.JSON(http.StatusOK, frame)
+}
+
+func (handler *FrameHandler) GetFrameImage(context *gin.Context) {
+	deviceID := context.Query("device-id")
+	if deviceID == "" {
+		context.JSON(http.StatusBadRequest, models.ErrorResponse{Error: "device-id query parameter is required"})
+		return
+	}
+
+	frame, err := handler.frameStore.GetLastFrame(deviceID)
+	if err != nil {
+		if errors.Is(err, store.ErrFrameNotFound) {
+			context.JSON(http.StatusNotFound, models.ErrorResponse{Error: "no frame found for device"})
+			return
+		}
+		context.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: "failed to retrieve frame"})
+		return
+	}
+
+	if _, err := os.Stat(frame.Path); err != nil {
+		if os.IsNotExist(err) {
+			context.JSON(http.StatusNotFound, models.ErrorResponse{Error: "frame image file not found"})
+			return
+		}
+		context.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: "failed to read frame image"})
+		return
+	}
+
+	context.File(frame.Path)
 }

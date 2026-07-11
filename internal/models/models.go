@@ -31,9 +31,9 @@ type FramePayload struct {
 }
 
 type Device struct {
-	ID          int64  `json:"id"`
-	DeviceName  string `json:"device_name"`
-	MACAddress  string `json:"mac_address"`
+	ID         int64  `json:"id"`
+	DeviceName string `json:"device_name"`
+	MACAddress string `json:"mac_address"`
 }
 
 type FrameRecord struct {
@@ -46,26 +46,83 @@ type FrameRecord struct {
 }
 
 type DeviceMetricsPayload struct {
-	DeviceID      string    `json:"device_id" binding:"required"`
-	CPUUsage      float64   `json:"cpu_usage_percent"`
-	MemoryUsage   float64   `json:"memory_usage_percent"`
-	DiskUsage     float64   `json:"disk_usage_percent"`
-	BatteryLevel  *float64  `json:"battery_level_percent,omitempty"`
-	TemperatureC  *float64  `json:"temperature_celsius,omitempty"`
-	SignalStrength *int     `json:"signal_strength_dbm,omitempty"`
-	RecordedAt    time.Time `json:"recorded_at"`
+	DeviceID       string    `json:"device_id" binding:"required"`
+	BatteryLevel   *float64  `json:"battery_level_percent,omitempty"`
+	SignalStrength *int      `json:"signal_strength_dbm,omitempty"`
+	NetworkType    string    `json:"network_type,omitempty"`
+	TemperatureC   *float64  `json:"temperature_celsius,omitempty"`
+	Latitude       *float64  `json:"latitude,omitempty"`
+	Longitude      *float64  `json:"longitude,omitempty"`
+	RecordedAt     time.Time `json:"recorded_at"`
 }
 
 type DeviceMetricsRecord struct {
 	DeviceID       string    `json:"device_id"`
-	CPUUsage       float64   `json:"cpu_usage_percent"`
-	MemoryUsage    float64   `json:"memory_usage_percent"`
-	DiskUsage      float64   `json:"disk_usage_percent"`
 	BatteryLevel   *float64  `json:"battery_level_percent,omitempty"`
-	TemperatureC   *float64  `json:"temperature_celsius,omitempty"`
 	SignalStrength *int      `json:"signal_strength_dbm,omitempty"`
+	NetworkType    string    `json:"network_type,omitempty"`
+	TemperatureC   *float64  `json:"temperature_celsius,omitempty"`
+	Latitude       *float64  `json:"latitude,omitempty"`
+	Longitude      *float64  `json:"longitude,omitempty"`
 	RecordedAt     time.Time `json:"recorded_at"`
 	ReceivedAt     time.Time `json:"received_at"`
+}
+
+type PhoneActionPayload struct {
+	DeviceID   string         `json:"device_id" binding:"required"`
+	ActionType string         `json:"action_type" binding:"required"`
+	Payload    map[string]any `json:"payload"`
+}
+
+type PhoneActionRecord struct {
+	ID         int64          `json:"id"`
+	DeviceID   string         `json:"device_id"`
+	ActionType string         `json:"action_type"`
+	Payload    map[string]any `json:"payload"`
+	SentAt     time.Time      `json:"sent_at"`
+	Status     string         `json:"status"`
+}
+
+type PhoneActionAckPayload struct {
+	Status string `json:"status"`
+}
+
+type AppSettingPayload struct {
+	Platform string `json:"platform" binding:"required"`
+	Key      string `json:"key" binding:"required"`
+	Value    string `json:"value" binding:"required"`
+}
+
+type AppSettingRecord struct {
+	Platform  string    `json:"platform"`
+	Key       string    `json:"key"`
+	Value     string    `json:"value"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+type AIModelPayload struct {
+	ModelName string `json:"model_name" binding:"required"`
+	Path      string `json:"path" binding:"required"`
+	Version   string `json:"version"`
+}
+
+type AIModelRecord struct {
+	ID        int64     `json:"id"`
+	ModelName string    `json:"model_name"`
+	Path      string    `json:"path"`
+	Version   string    `json:"version"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+type WebRTCConnectionRecord struct {
+	ID             int64      `json:"id"`
+	DeviceID       string     `json:"device_id"`
+	Room           string     `json:"room"`
+	Identity       string     `json:"identity"`
+	Role           string     `json:"role"`
+	ConnectedAt    time.Time  `json:"connected_at"`
+	DisconnectedAt *time.Time `json:"disconnected_at,omitempty"`
+	Status         string     `json:"status"`
 }
 
 type LiveKitTokenRequest struct {

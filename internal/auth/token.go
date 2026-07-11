@@ -35,7 +35,7 @@ func (issuer *TokenIssuer) IssueToken(subject string) (string, time.Time, error)
 			Subject:   subject,
 			ExpiresAt: jwt.NewNumericDate(expiresAt),
 			IssuedAt:  jwt.NewNumericDate(time.Now().UTC()),
-			Issuer:    "parkiroid-server",
+			Issuer:    "dogan-server",
 		},
 	}
 

@@ -4,11 +4,15 @@ import (
 	"errors"
 	"time"
 
-	"github.com/parkiroid/parkiroid-server/internal/models"
+	"github.com/dogan/dogan-server/internal/models"
 )
 
-var ErrFrameNotFound = errors.New("frame not found for device")
-var ErrMetricsNotFound = errors.New("device metrics not found")
+var (
+	ErrFrameNotFound    = errors.New("frame not found for device")
+	ErrMetricsNotFound  = errors.New("device metrics not found")
+	ErrActionNotFound   = errors.New("action not found")
+	ErrDeviceNotFound   = errors.New("device not found")
+)
 
 type FrameStore interface {
 	SaveFrame(frame models.FrameRecord) error
@@ -18,6 +22,31 @@ type FrameStore interface {
 type MetricsStore interface {
 	SaveMetrics(metrics models.DeviceMetricsRecord) error
 	GetLatestMetrics(deviceID string) (models.DeviceMetricsRecord, error)
+}
+
+type LoginLogStore interface {
+	SaveLoginLog(ip, username, browserInfo string, success bool) error
+}
+
+type ActionStore interface {
+	CreateAction(action models.PhoneActionRecord) (models.PhoneActionRecord, error)
+	GetPendingActions(deviceID string) ([]models.PhoneActionRecord, error)
+	AcknowledgeAction(actionID int64, status string) error
+}
+
+type SettingsStore interface {
+	UpsertSetting(setting models.AppSettingRecord) error
+	GetSettings(platform string) ([]models.AppSettingRecord, error)
+}
+
+type AIModelStore interface {
+	UpsertAIModel(model models.AIModelRecord) (models.AIModelRecord, error)
+	ListAIModels() ([]models.AIModelRecord, error)
+}
+
+type WebRTCStore interface {
+	SaveConnection(connection models.WebRTCConnectionRecord) (models.WebRTCConnectionRecord, error)
+	ListConnections(deviceID string, limit int) ([]models.WebRTCConnectionRecord, error)
 }
 
 type RetentionStore interface {

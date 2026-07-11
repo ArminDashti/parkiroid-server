@@ -1,56 +1,44 @@
-# parkiroid-server
+# dogan-server
 
-Go API server for Parkiroid device frames, metrics, and LiveKit WebRTC streaming.
+Go API server for Dogan Android/Web clients: REST image and telemetry transfer, PostgreSQL persistence, and LiveKit WebRTC streaming.
 
 ## Docker
 
-Build and run with Docker Compose (includes LiveKit server):
+Build and run with Docker Compose (includes PostgreSQL and LiveKit):
 
-```bash
-docker compose up --build
+```powershell
+.\build-docker-image.ps1
+docker compose up -d
 ```
 
-The API listens on port `8080` by default. LiveKit listens on port `7880`. Override host ports with `PARKIROID_HOST_PORT` and `LIVEKIT_HOST_PORT`.
+The API listens on port `8080` by default. PostgreSQL on `5432`. LiveKit on `7880`.
 
-Generate an embedded API token for client apps:
+Login credentials for the web app are in `armin-credentials.txt` (generated locally, gitignored).
+
+Generate an embedded API token for Android client apps:
 
 ```bash
 go run ./cmd/issue-token
 ```
 
-Set the same value in your app and on the server as `PARKIROID_EMBEDDED_API_TOKEN`.
+Set the same value on the server as `DOGAN_EMBEDDED_API_TOKEN`.
 
-Set secrets for production:
+## API
 
-```bash
-export PARKIROID_EMBEDDED_API_TOKEN=your-embedded-api-token
-export PARKIROID_JWT_SECRET=your-jwt-secret
-export PARKIROID_LIVEKIT_API_KEY=your-livekit-api-key
-export PARKIROID_LIVEKIT_API_SECRET=your-livekit-api-secret
-export PARKIROID_LIVEKIT_URL=wss://your-livekit-host
-docker compose up --build -d
+See `endpoints.md` for the endpoint list.
+
+Base path: `/dogan/api/v1`
+
+Health check: `GET http://localhost:8080/dogan/api/v1/health`
+
+Test with dummy data after Docker is running:
+
+```powershell
+.\scripts\test-dummy-data.ps1
 ```
 
-Replace the bcrypt password hash in `internal/auth/credentials.go` before deploying.
+## WebRTC
 
-SQLite and uploaded frame images are stored in the `parkiroid-data` Docker volume at `/data` inside the container.
-
-### LiveKit streaming
-
-1. Obtain a Parkiroid bearer token from `POST /parkiroid/api/v1/auth`.
-2. Request a LiveKit token from `POST /parkiroid/api/v1/streaming/token` with `device_id` and `role` (`publisher` for devices, `subscriber` for viewers).
+1. Obtain a JWT from `POST /dogan/api/v1/auth`.
+2. Request a LiveKit token from `POST /dogan/api/v1/streaming/token` with `device_id` and `role` (`publisher` for Android, `subscriber` for web).
 3. Connect with a LiveKit client SDK using the returned `url`, `token`, and `room`.
-
-See `endpoints.md` for the full API contract.
-
-### Docker only (without Compose)
-
-```bash
-docker build -t parkiroid-server .
-docker run --rm -p 8080:8080 \
-  -e PARKIROID_JWT_SECRET=your-jwt-secret \
-  -v parkiroid-data:/data \
-  parkiroid-server
-```
-
-Health check: `GET http://localhost:8080/parkiroid/api/v1/health`
