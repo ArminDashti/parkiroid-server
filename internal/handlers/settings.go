@@ -19,14 +19,22 @@ func NewSettingsHandler(settingsStore store.SettingsStore) *SettingsHandler {
 
 func (handler *SettingsHandler) GetSettings(context *gin.Context) {
 	platform := context.Query("platform")
+	if platform == "" && context.Query("device_id") != "" {
+		platform = "android"
+	}
 	if platform == "" {
-		context.JSON(http.StatusBadRequest, models.ErrorResponse{Error: "platform query parameter is required"})
+		context.JSON(http.StatusBadRequest, models.ErrorResponse{Error: "platform or device_id query parameter is required"})
 		return
 	}
 
 	settings, err := handler.settingsStore.GetSettings(platform)
 	if err != nil {
 		context.JSON(http.StatusInternalServerError, models.ErrorResponse{Error: "failed to retrieve settings"})
+		return
+	}
+
+	if context.Query("device_id") != "" {
+		context.JSON(http.StatusOK, settingsToFlatMap(settings))
 		return
 	}
 

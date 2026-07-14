@@ -3,8 +3,9 @@ package models
 import "time"
 
 type AuthRequest struct {
-	Username string `json:"username" binding:"required"`
-	Password string `json:"password" binding:"required"`
+	Username string `json:"username"`
+	Password string `json:"password"`
+	APIKey   string `json:"api_key"`
 }
 
 type AuthResponse struct {
@@ -101,17 +102,33 @@ type AppSettingRecord struct {
 }
 
 type AIModelPayload struct {
-	ModelName string `json:"model_name" binding:"required"`
-	Path      string `json:"path" binding:"required"`
-	Version   string `json:"version"`
+	ModelName   string   `json:"model_name" binding:"required"`
+	Version     string   `json:"version"`
+	ParamSHA256 string   `json:"param_sha256"`
+	BinSHA256   string   `json:"bin_sha256"`
+	Labels      []string `json:"labels"`
+	Format      string   `json:"format"`
 }
 
 type AIModelRecord struct {
-	ID        int64     `json:"id"`
-	ModelName string    `json:"model_name"`
-	Path      string    `json:"path"`
-	Version   string    `json:"version"`
-	UpdatedAt time.Time `json:"updated_at"`
+	ID          int64     `json:"id"`
+	ModelName   string    `json:"model_name"`
+	ParamSHA256 string    `json:"param_sha256"`
+	BinSHA256   string    `json:"bin_sha256"`
+	Labels      []string  `json:"labels"`
+	Format      string    `json:"format"`
+	Version     string    `json:"version"`
+	UpdatedAt   time.Time `json:"updated_at"`
+}
+
+type AIModelManifestEntry struct {
+	ID          string   `json:"id"`
+	ParamURL    string   `json:"param_url"`
+	BinURL      string   `json:"bin_url"`
+	ParamSHA256 string   `json:"param_sha256"`
+	BinSHA256   string   `json:"bin_sha256"`
+	Format      string   `json:"format"`
+	Labels      []string `json:"labels"`
 }
 
 type WebRTCConnectionRecord struct {
@@ -137,6 +154,58 @@ type LiveKitTokenResponse struct {
 	Room      string    `json:"room"`
 	Identity  string    `json:"identity"`
 	ExpiresAt time.Time `json:"expires_at"`
+}
+
+type WebRTCSessionRequest struct {
+	DeviceID string `json:"device_id" binding:"required"`
+}
+
+type IceServerConfig struct {
+	URLs       []string `json:"urls"`
+	Username   string   `json:"username,omitempty"`
+	Credential string   `json:"credential,omitempty"`
+}
+
+type WebRTCSessionResponse struct {
+	SessionID  string            `json:"session_id"`
+	Token      string            `json:"token"`
+	URL        string            `json:"url"`
+	Room       string            `json:"room"`
+	Identity   string            `json:"identity"`
+	ExpiresAt  time.Time         `json:"expires_at"`
+	IceServers []IceServerConfig `json:"ice_servers"`
+}
+
+type DeviceListItem struct {
+	ID       string `json:"id"`
+	Name     string `json:"name"`
+	Status   string `json:"status"`
+	Location string `json:"location,omitempty"`
+}
+
+type DeviceStreamResponse struct {
+	DeviceID  string    `json:"device_id"`
+	Token     string    `json:"token"`
+	URL       string    `json:"url"`
+	Room      string    `json:"room"`
+	Identity  string    `json:"identity"`
+	ExpiresAt time.Time `json:"expires_at"`
+}
+
+type WebLoginRequest struct {
+	Email    string `json:"email" binding:"required"`
+	Password string `json:"password" binding:"required"`
+}
+
+type WebUser struct {
+	ID    string `json:"id"`
+	Email string `json:"email"`
+	Name  string `json:"name"`
+}
+
+type WebAuthResponse struct {
+	Token string  `json:"token"`
+	User  WebUser `json:"user"`
 }
 
 type ErrorResponse struct {

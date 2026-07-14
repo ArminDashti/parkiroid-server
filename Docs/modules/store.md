@@ -8,15 +8,16 @@ PostgreSQL persistence for all Dogan data.
 - `phone_actions` — commands queued for Android
 - `webrtc_connections` — LiveKit session log
 - `app_settings` — key/value settings per platform (web/android)
-- `ai_model_paths` — downloadable AI model paths
+- `ai_model_paths` — NCNN model metadata (SHA-256, labels, format)
 - `android_telemetry` — battery, signal, network, temp, GPS
 - `devices` — device registry helper
 
 ## Key files
 - `schema.go` — DDL applied on startup
-- `postgres.go` — CRUD implementations
+- `postgres.go` — CRUD implementations (includes `ListDevices` for web device picker)
 - `retention.go` — background cleanup of old frames/metrics
-- `frame_storage.go` — writes JPEG files to disk
+- `model_files.go` — NCNN file paths, SHA-256, on-disk presence checks
 
 ## Config
-`DOGAN_DATABASE_URL` (default `postgres://dogan:dogan@postgres:5432/dogan?sslmode=disable`)
+`DOGAN_DATABASE_URL` (default `postgres://dogan:dogan@postgres:5432/dogan?sslmode=disable`)  
+`DOGAN_MODELS_DIR` (default `models`, Docker `/data/models`) — on-disk layout `{id}/model.param` and `{id}/model.bin`

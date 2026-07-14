@@ -19,8 +19,10 @@
 │   ├── models/models.go         # Request/response DTOs
 │   ├── router/router.go         # Route registration
 │   └── store/                   # PostgreSQL persistence layer
+│       ├── model_files.go       # NCNN paths, SHA-256, file checks
 ├── livekit.yaml                 # LiveKit server config
 ├── README.md                    # Quick start guide
 └── scripts/
+    ├── register-models.ps1      # Scan DOGAN_MODELS_DIR and POST /ai-models
     └── test-dummy-data.ps1      # Docker integration smoke test
 ```

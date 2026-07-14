@@ -30,32 +30,44 @@ func New(applicationConfig config.Config) *gin.Engine {
 
 	tokenIssuer := auth.NewTokenIssuer(applicationConfig.JWTSecret, applicationConfig.TokenTTL)
 
-	authHandler := handlers.NewAuthHandler(tokenIssuer, postgresStore)
+	authHandler := handlers.NewAuthHandler(
+		tokenIssuer,
+		postgresStore,
+		applicationConfig.EmbeddedAPIToken,
+		applicationConfig.DeviceAPIKey,
+		applicationConfig.TokenTTL,
+	)
 	healthHandler := handlers.NewHealthHandler()
 	endpointsHandler := handlers.NewEndpointsHandler()
 	frameHandler := handlers.NewFrameHandler(postgresStore, applicationConfig.FramesDir)
 	deviceMetricsHandler := handlers.NewDeviceMetricsHandler(postgresStore)
 	actionsHandler := handlers.NewActionsHandler(postgresStore)
 	settingsHandler := handlers.NewSettingsHandler(postgresStore)
-	aiModelsHandler := handlers.NewAIModelsHandler(postgresStore)
+	aiModelsHandler := handlers.NewAIModelsHandler(postgresStore, applicationConfig.ModelsDir)
 	webrtcHandler := handlers.NewWebRTCHandler(postgresStore)
 	liveKitTokenIssuer := livekitauth.NewTokenIssuer(livekitauth.Config{
 		URL:       applicationConfig.LiveKitURL,
+		PublicURL: applicationConfig.LiveKitPublicURL,
 		APIKey:    applicationConfig.LiveKitAPIKey,
 		APISecret: applicationConfig.LiveKitAPISecret,
 		TokenTTL:  applicationConfig.LiveKitTokenTTL,
 	})
 	liveKitHandler := handlers.NewLiveKitHandler(liveKitTokenIssuer, postgresStore)
+	webrtcSessionHandler := handlers.NewWebRTCSessionHandler(liveKitTokenIssuer, postgresStore)
+	devicesHandler := handlers.NewDevicesHandler(postgresStore, liveKitTokenIssuer, postgresStore)
 
 	api := engine.Group("/dogan/api/v1")
 	{
 		api.POST("/auth", authHandler.Authenticate)
+		api.POST("/auth/login", authHandler.WebLogin)
 		api.GET("/endpoints", endpointsHandler.ListEndpoints)
 		api.GET("/health", healthHandler.GetHealth)
 
 		protected := api.Group("/")
 		protected.Use(middleware.RequireBearerToken(tokenIssuer, applicationConfig.EmbeddedAPIToken))
 		{
+			protected.GET("/auth/me", authHandler.CurrentUser)
+			protected.POST("/auth/logout", authHandler.Logout)
 			protected.GET("/last-frame", frameHandler.GetLastFrame)
 			protected.GET("/frame/image", frameHandler.GetFrameImage)
 			protected.POST("/frame", frameHandler.SubmitFrame)
@@ -68,8 +80,14 @@ func New(applicationConfig config.Config) *gin.Engine {
 			protected.PUT("/settings", settingsHandler.UpsertSetting)
 			protected.GET("/ai-models", aiModelsHandler.ListAIModels)
 			protected.POST("/ai-models", aiModelsHandler.UpsertAIModel)
+			protected.GET("/models", aiModelsHandler.ListModelsManifest)
+			protected.GET("/models/:id/param", aiModelsHandler.GetModelParam)
+			protected.GET("/models/:id/bin", aiModelsHandler.GetModelBin)
 			protected.GET("/webrtc/connections", webrtcHandler.ListConnections)
 			protected.POST("/streaming/token", liveKitHandler.IssueToken)
+			protected.POST("/webrtc/session", webrtcSessionHandler.CreateSession)
+			protected.GET("/devices", devicesHandler.ListDevices)
+			protected.GET("/devices/:id/stream", devicesHandler.GetDeviceStream)
 		}
 	}
 

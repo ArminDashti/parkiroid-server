@@ -12,6 +12,7 @@ var (
 	ErrMetricsNotFound  = errors.New("device metrics not found")
 	ErrActionNotFound   = errors.New("action not found")
 	ErrDeviceNotFound   = errors.New("device not found")
+	ErrAIModelNotFound  = errors.New("ai model not found")
 )
 
 type FrameStore interface {
@@ -42,11 +43,16 @@ type SettingsStore interface {
 type AIModelStore interface {
 	UpsertAIModel(model models.AIModelRecord) (models.AIModelRecord, error)
 	ListAIModels() ([]models.AIModelRecord, error)
+	GetAIModelByName(modelName string) (models.AIModelRecord, error)
 }
 
 type WebRTCStore interface {
 	SaveConnection(connection models.WebRTCConnectionRecord) (models.WebRTCConnectionRecord, error)
 	ListConnections(deviceID string, limit int) ([]models.WebRTCConnectionRecord, error)
+}
+
+type DeviceStore interface {
+	ListDevices() ([]models.DeviceListItem, error)
 }
 
 type RetentionStore interface {

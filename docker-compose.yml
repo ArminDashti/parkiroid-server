@@ -42,11 +42,14 @@ services:
     environment:
       DOGAN_LISTEN_ADDRESS: ":8080"
       DOGAN_EMBEDDED_API_TOKEN: ${DOGAN_EMBEDDED_API_TOKEN:-dg_dev_a8f3c2e1b9d74f6a0e5c3b9d2f7a1e4c8b6d0f3a7e2c9b5d1f8a4e6c0b3d7f9}
+      DOGAN_DEVICE_API_KEY: ${DOGAN_DEVICE_API_KEY:-dogan-dev-key}
       DOGAN_JWT_SECRET: ${DOGAN_JWT_SECRET:-dogan-dev-jwt-secret}
       DOGAN_TOKEN_TTL: ${DOGAN_TOKEN_TTL:-86400}
       DOGAN_DATABASE_URL: postgres://dogan:dogan@postgres:5432/dogan?sslmode=disable
       DOGAN_FRAMES_DIR: /data/frames
+      DOGAN_MODELS_DIR: /data/models
       DOGAN_LIVEKIT_URL: ${DOGAN_LIVEKIT_URL:-ws://livekit:7880}
+      DOGAN_LIVEKIT_PUBLIC_URL: ${DOGAN_LIVEKIT_PUBLIC_URL:-ws://localhost:7880}
       DOGAN_LIVEKIT_API_KEY: ${DOGAN_LIVEKIT_API_KEY:-devkey}
       DOGAN_LIVEKIT_API_SECRET: ${DOGAN_LIVEKIT_API_SECRET:-secret}
       DOGAN_LIVEKIT_TOKEN_TTL: ${DOGAN_LIVEKIT_TOKEN_TTL:-3600}

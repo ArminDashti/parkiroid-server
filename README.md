@@ -39,6 +39,26 @@ Test with dummy data after Docker is running:
 
 ## WebRTC
 
-1. Obtain a JWT from `POST /dogan/api/v1/auth`.
-2. Request a LiveKit token from `POST /dogan/api/v1/streaming/token` with `device_id` and `role` (`publisher` for Android, `subscriber` for web).
-3. Connect with a LiveKit client SDK using the returned `url`, `token`, and `room`.
+1. Obtain a JWT from `POST /dogan/api/v1/auth` (or `POST /auth/login` from the web app).
+2. **Android:** call `POST /dogan/api/v1/webrtc/session` with `device_id` (or `POST /streaming/token` with `role: publisher`).
+3. **Web:** call `GET /dogan/api/v1/devices/:id/stream` for subscriber credentials.
+4. Connect with a LiveKit client SDK using the returned `url`, `token`, and `room`.
+
+Set `DOGAN_LIVEKIT_PUBLIC_URL` (e.g. `ws://localhost:7880`) so clients receive a reachable LiveKit URL when the API runs in Docker.
+
+## AI models (NCNN)
+
+Place NCNN files on the server under `DOGAN_MODELS_DIR` (Docker default `/data/models`):
+
+```
+{model_id}/model.param
+{model_id}/model.bin
+```
+
+Model ids must match the Android app (`yolov8_nano`, `yolov8_small`, `mobilenet_ssd`). Register metadata:
+
+```powershell
+.\scripts\register-models.ps1
+```
+
+Android fetches `GET /dogan/api/v1/models` and downloads `.param`/`.bin` with bearer auth.

@@ -1,6 +1,6 @@
 # Dogan Server
 
-Dogan is a Go REST API for a personal Android + web monitoring stack. It stores camera frames, Android telemetry, app settings, AI model paths, and phone actions in PostgreSQL, and issues LiveKit tokens for WebRTC streaming between Android and the web client.
+Dogan is a Go REST API for a personal Android + web monitoring stack. It stores camera frames, Android telemetry, app settings, NCNN AI model metadata and binaries, and phone actions in PostgreSQL, and issues LiveKit tokens for WebRTC streaming between Android and the web client.
 
 **Stack:** Go 1.26, Gin, PostgreSQL 16, LiveKit, Docker Compose.
 
