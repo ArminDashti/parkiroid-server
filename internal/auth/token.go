@@ -49,6 +49,11 @@ func (issuer *TokenIssuer) IssueToken(subject string) (string, time.Time, error)
 }
 
 func (issuer *TokenIssuer) ValidateToken(tokenString string) error {
+	_, err := issuer.ParseToken(tokenString)
+	return err
+}
+
+func (issuer *TokenIssuer) ParseToken(tokenString string) (Claims, error) {
 	token, err := jwt.ParseWithClaims(tokenString, &Claims{}, func(token *jwt.Token) (any, error) {
 		if token.Method != jwt.SigningMethodHS256 {
 			return nil, ErrInvalidToken
@@ -56,12 +61,13 @@ func (issuer *TokenIssuer) ValidateToken(tokenString string) error {
 		return issuer.secret, nil
 	})
 	if err != nil {
-		return ErrInvalidToken
+		return Claims{}, ErrInvalidToken
 	}
 
-	if !token.Valid {
-		return ErrInvalidToken
+	claims, ok := token.Claims.(*Claims)
+	if !ok || !token.Valid {
+		return Claims{}, ErrInvalidToken
 	}
 
-	return nil
+	return *claims, nil
 }

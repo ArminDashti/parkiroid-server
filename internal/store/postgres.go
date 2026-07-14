@@ -34,6 +34,11 @@ func OpenPostgres(databaseURL string, retentionPeriod time.Duration) (*PostgresS
 		return nil, fmt.Errorf("apply postgres schema: %w", err)
 	}
 
+	if _, err := database.Exec(schemaMigrationDDL); err != nil {
+		_ = database.Close()
+		return nil, fmt.Errorf("apply postgres schema migrations: %w", err)
+	}
+
 	return &PostgresStore{db: database, retentionPeriod: retentionPeriod}, nil
 }
 
@@ -376,16 +381,32 @@ func (store *PostgresStore) UpsertAIModel(model models.AIModelRecord) (models.AI
 		updatedAt = time.Now().UTC()
 	}
 
-	err := store.db.QueryRow(
-		`INSERT INTO ai_model_paths (model_name, path, version, updated_at)
-		 VALUES ($1, $2, $3, $4)
+	format := model.Format
+	if format == "" {
+		format = "ncnn"
+	}
+
+	labelsJSON, err := json.Marshal(model.Labels)
+	if err != nil {
+		return models.AIModelRecord{}, fmt.Errorf("marshal ai model labels: %w", err)
+	}
+
+	err = store.db.QueryRow(
+		`INSERT INTO ai_model_paths (model_name, param_sha256, bin_sha256, labels, format, version, updated_at)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7)
 		 ON CONFLICT (model_name) DO UPDATE SET
-		   path = EXCLUDED.path,
+		   param_sha256 = EXCLUDED.param_sha256,
+		   bin_sha256 = EXCLUDED.bin_sha256,
+		   labels = EXCLUDED.labels,
+		   format = EXCLUDED.format,
 		   version = EXCLUDED.version,
 		   updated_at = EXCLUDED.updated_at
 		 RETURNING id, updated_at`,
 		model.ModelName,
-		model.Path,
+		model.ParamSHA256,
+		model.BinSHA256,
+		labelsJSON,
+		format,
 		model.Version,
 		updatedAt,
 	).Scan(&model.ID, &model.UpdatedAt)
@@ -393,12 +414,13 @@ func (store *PostgresStore) UpsertAIModel(model models.AIModelRecord) (models.AI
 		return models.AIModelRecord{}, fmt.Errorf("upsert ai model path: %w", err)
 	}
 
+	model.Format = format
 	return model, nil
 }
 
 func (store *PostgresStore) ListAIModels() ([]models.AIModelRecord, error) {
 	rows, err := store.db.Query(
-		`SELECT id, model_name, path, version, updated_at
+		`SELECT id, model_name, param_sha256, bin_sha256, labels, format, version, updated_at
 		 FROM ai_model_paths
 		 ORDER BY model_name`,
 	)
@@ -410,8 +432,21 @@ func (store *PostgresStore) ListAIModels() ([]models.AIModelRecord, error) {
 	modelsList := make([]models.AIModelRecord, 0)
 	for rows.Next() {
 		var model models.AIModelRecord
-		if err := rows.Scan(&model.ID, &model.ModelName, &model.Path, &model.Version, &model.UpdatedAt); err != nil {
+		var labelsJSON []byte
+		if err := rows.Scan(
+			&model.ID,
+			&model.ModelName,
+			&model.ParamSHA256,
+			&model.BinSHA256,
+			&labelsJSON,
+			&model.Format,
+			&model.Version,
+			&model.UpdatedAt,
+		); err != nil {
 			return nil, fmt.Errorf("scan ai model path: %w", err)
+		}
+		if err := json.Unmarshal(labelsJSON, &model.Labels); err != nil {
+			return nil, fmt.Errorf("unmarshal ai model labels: %w", err)
 		}
 		modelsList = append(modelsList, model)
 	}
@@ -421,6 +456,36 @@ func (store *PostgresStore) ListAIModels() ([]models.AIModelRecord, error) {
 	}
 
 	return modelsList, nil
+}
+
+func (store *PostgresStore) GetAIModelByName(modelName string) (models.AIModelRecord, error) {
+	var model models.AIModelRecord
+	var labelsJSON []byte
+	err := store.db.QueryRow(
+		`SELECT id, model_name, param_sha256, bin_sha256, labels, format, version, updated_at
+		 FROM ai_model_paths
+		 WHERE model_name = $1`,
+		modelName,
+	).Scan(
+		&model.ID,
+		&model.ModelName,
+		&model.ParamSHA256,
+		&model.BinSHA256,
+		&labelsJSON,
+		&model.Format,
+		&model.Version,
+		&model.UpdatedAt,
+	)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return models.AIModelRecord{}, ErrAIModelNotFound
+		}
+		return models.AIModelRecord{}, fmt.Errorf("get ai model path: %w", err)
+	}
+	if err := json.Unmarshal(labelsJSON, &model.Labels); err != nil {
+		return models.AIModelRecord{}, fmt.Errorf("unmarshal ai model labels: %w", err)
+	}
+	return model, nil
 }
 
 func (store *PostgresStore) SaveConnection(connection models.WebRTCConnectionRecord) (models.WebRTCConnectionRecord, error) {
@@ -616,6 +681,45 @@ func (store *PostgresStore) resolveDeviceRowID(deviceIdentifier string) (int64, 
 	}
 
 	return deviceRowID, nil
+}
+
+func (store *PostgresStore) ListDevices() ([]models.DeviceListItem, error) {
+	rows, err := store.db.Query(
+		`SELECT d.mac_address, d.device_name,
+		        CASE
+		            WHEN t.recorded_at IS NOT NULL AND t.recorded_at >= NOW() AT TIME ZONE 'UTC' - INTERVAL '5 minutes'
+		            THEN 'online'
+		            ELSE 'offline'
+		        END AS status
+		 FROM devices d
+		 LEFT JOIN LATERAL (
+		     SELECT recorded_at
+		     FROM android_telemetry
+		     WHERE device_id = d.id
+		     ORDER BY recorded_at DESC
+		     LIMIT 1
+		 ) t ON TRUE
+		 ORDER BY d.device_name ASC, d.mac_address ASC`,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("list devices: %w", err)
+	}
+	defer rows.Close()
+
+	devices := make([]models.DeviceListItem, 0)
+	for rows.Next() {
+		var device models.DeviceListItem
+		if err := rows.Scan(&device.ID, &device.Name, &device.Status); err != nil {
+			return nil, fmt.Errorf("scan device: %w", err)
+		}
+		devices = append(devices, device)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate devices: %w", err)
+	}
+
+	return devices, nil
 }
 
 func nullableFloat(value *float64) any {

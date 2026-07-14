@@ -67,7 +67,10 @@ CREATE TABLE IF NOT EXISTS app_settings (
 CREATE TABLE IF NOT EXISTS ai_model_paths (
 	id BIGSERIAL PRIMARY KEY,
 	model_name TEXT NOT NULL UNIQUE,
-	path TEXT NOT NULL,
+	param_sha256 TEXT NOT NULL DEFAULT '',
+	bin_sha256 TEXT NOT NULL DEFAULT '',
+	labels JSONB NOT NULL DEFAULT '[]',
+	format TEXT NOT NULL DEFAULT 'ncnn',
 	version TEXT NOT NULL DEFAULT '',
 	updated_at TIMESTAMPTZ NOT NULL
 );
@@ -87,4 +90,12 @@ CREATE TABLE IF NOT EXISTS android_telemetry (
 
 CREATE INDEX IF NOT EXISTS idx_android_telemetry_device_recorded_at
 	ON android_telemetry (device_id, recorded_at DESC);
+`
+
+const schemaMigrationDDL = `
+ALTER TABLE ai_model_paths ADD COLUMN IF NOT EXISTS param_sha256 TEXT NOT NULL DEFAULT '';
+ALTER TABLE ai_model_paths ADD COLUMN IF NOT EXISTS bin_sha256 TEXT NOT NULL DEFAULT '';
+ALTER TABLE ai_model_paths ADD COLUMN IF NOT EXISTS labels JSONB NOT NULL DEFAULT '[]';
+ALTER TABLE ai_model_paths ADD COLUMN IF NOT EXISTS format TEXT NOT NULL DEFAULT 'ncnn';
+ALTER TABLE ai_model_paths DROP COLUMN IF EXISTS path;
 `

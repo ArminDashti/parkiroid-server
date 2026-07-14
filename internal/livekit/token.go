@@ -20,9 +20,17 @@ var (
 
 type Config struct {
 	URL       string
+	PublicURL string
 	APIKey    string
 	APISecret string
 	TokenTTL  time.Duration
+}
+
+func (config Config) ClientURL() string {
+	if config.PublicURL != "" {
+		return config.PublicURL
+	}
+	return config.URL
 }
 
 func (config Config) Enabled() bool {
@@ -102,7 +110,7 @@ func (issuer *TokenIssuer) IssueToken(request TokenRequest) (TokenResponse, erro
 
 	return TokenResponse{
 		Token:     token,
-		URL:       issuer.config.URL,
+		URL:       issuer.config.ClientURL(),
 		Room:      roomName,
 		Identity:  identity,
 		ExpiresAt: expiresAt,
