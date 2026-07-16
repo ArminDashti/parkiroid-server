@@ -59,3 +59,8 @@ func sanitizePathSegment(value string) string {
 
 	return strings.Trim(replaced, "-")
 }
+
+// SanitizeDeviceSegment is the exported form of sanitizePathSegment for handlers.
+func SanitizeDeviceSegment(value string) string {
+	return sanitizePathSegment(value)
+}

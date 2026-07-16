@@ -16,6 +16,8 @@ const (
 	defaultDatabaseURL      = "postgres://dogan:dogan@localhost:5432/dogan?sslmode=disable"
 	defaultFramesDir        = "frames"
 	defaultModelsDir        = "models"
+	defaultSoundsDir        = "sounds"
+	defaultAudioDir         = "diagnostic-audio"
 	defaultRetentionDays    = 7
 	defaultLiveKitURL       = "ws://localhost:7880"
 	defaultLiveKitAPIKey    = "devkey"
@@ -33,6 +35,8 @@ type Config struct {
 	DatabaseURL      string
 	FramesDir        string
 	ModelsDir        string
+	SoundsDir        string
+	AudioDir         string
 	RetentionPeriod  time.Duration
 	LiveKitURL       string
 	LiveKitPublicURL string
@@ -58,6 +62,8 @@ func Load() Config {
 		DatabaseURL:      envOrDefault("DOGAN_DATABASE_URL", defaultDatabaseURL),
 		FramesDir:        envOrDefault("DOGAN_FRAMES_DIR", defaultFramesDir),
 		ModelsDir:        envOrDefault("DOGAN_MODELS_DIR", defaultModelsDir),
+		SoundsDir:        envOrDefault("DOGAN_SOUNDS_DIR", defaultSoundsDir),
+		AudioDir:         envOrDefault("DOGAN_AUDIO_DIR", defaultAudioDir),
 		RetentionPeriod:  envDaysOrDefault("DOGAN_RETENTION_DAYS", defaultRetentionDays),
 		LiveKitURL:       envOrDefault("DOGAN_LIVEKIT_URL", defaultLiveKitURL),
 		LiveKitPublicURL: envOrDefault("DOGAN_LIVEKIT_PUBLIC_URL", ""),

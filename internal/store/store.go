@@ -18,11 +18,14 @@ var (
 type FrameStore interface {
 	SaveFrame(frame models.FrameRecord) error
 	GetLastFrame(deviceID string) (models.FrameRecord, error)
+	ListFrames(limit int) ([]models.FrameRecord, error)
+	GetFrameByID(imageID int64) (models.FrameRecord, error)
 }
 
 type MetricsStore interface {
 	SaveMetrics(metrics models.DeviceMetricsRecord) error
 	GetLatestMetrics(deviceID string) (models.DeviceMetricsRecord, error)
+	ListMetricsHistory(deviceID string, limit int) ([]models.DeviceMetricsRecord, error)
 }
 
 type LoginLogStore interface {
@@ -53,6 +56,11 @@ type WebRTCStore interface {
 
 type DeviceStore interface {
 	ListDevices() ([]models.DeviceListItem, error)
+	GetDeviceName(deviceID string) (string, error)
+}
+
+type DiagnosticAudioStore interface {
+	SaveDiagnosticAudio(deviceID, segmentID, path string, startMs, endMs int64, rmsPeak float64, linkedAlertID, mode string) error
 }
 
 type RetentionStore interface {
