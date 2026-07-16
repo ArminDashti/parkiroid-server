@@ -140,8 +140,11 @@ func (store *PostgresStore) SaveMetrics(metrics models.DeviceMetricsRecord) erro
 	_, err = store.db.Exec(
 		`INSERT INTO android_telemetry (
 			device_id, battery_level, signal_strength, network_type,
-			temperature_c, latitude, longitude, recorded_at, received_at
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+			temperature_c, latitude, longitude,
+			cabin_noise_rms, gps_signal_quality, speed_kmh, ambient_light_lux,
+			server_latency_ms, device_ip_address, jolt,
+			recorded_at, received_at
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)`,
 		deviceRowID,
 		nullableFloat(metrics.BatteryLevel),
 		nullableInt(metrics.SignalStrength),
@@ -149,6 +152,13 @@ func (store *PostgresStore) SaveMetrics(metrics models.DeviceMetricsRecord) erro
 		nullableFloat(metrics.TemperatureC),
 		nullableFloat(metrics.Latitude),
 		nullableFloat(metrics.Longitude),
+		nullableFloat(metrics.CabinNoiseRMS),
+		nullIfEmpty(metrics.GPSSignalQuality),
+		nullableFloat(metrics.SpeedKmh),
+		nullableFloat(metrics.AmbientLightLux),
+		nullableInt(metrics.ServerLatencyMs),
+		nullIfEmpty(metrics.DeviceIPAddress),
+		nullableFloat(metrics.Jolt),
 		recordedAt,
 		receivedAt,
 	)
@@ -175,11 +185,21 @@ func (store *PostgresStore) GetLatestMetrics(deviceID string) (models.DeviceMetr
 	var longitude sql.NullFloat64
 	var signalStrength sql.NullInt64
 	var networkType sql.NullString
+	var cabinNoiseRMS sql.NullFloat64
+	var gpsSignalQuality sql.NullString
+	var speedKmh sql.NullFloat64
+	var ambientLightLux sql.NullFloat64
+	var serverLatencyMs sql.NullInt64
+	var deviceIPAddress sql.NullString
+	var jolt sql.NullFloat64
 	cutoff := store.retentionCutoff()
 
 	err = store.db.QueryRow(
 		`SELECT battery_level, signal_strength, network_type,
-		        temperature_c, latitude, longitude, recorded_at, received_at
+		        temperature_c, latitude, longitude,
+		        cabin_noise_rms, gps_signal_quality, speed_kmh, ambient_light_lux,
+		        server_latency_ms, device_ip_address, jolt,
+		        recorded_at, received_at
 		 FROM android_telemetry
 		 WHERE device_id = $1 AND recorded_at >= $2
 		 ORDER BY recorded_at DESC, id DESC
@@ -193,6 +213,13 @@ func (store *PostgresStore) GetLatestMetrics(deviceID string) (models.DeviceMetr
 		&temperatureC,
 		&latitude,
 		&longitude,
+		&cabinNoiseRMS,
+		&gpsSignalQuality,
+		&speedKmh,
+		&ambientLightLux,
+		&serverLatencyMs,
+		&deviceIPAddress,
+		&jolt,
 		&metrics.RecordedAt,
 		&metrics.ReceivedAt,
 	)
@@ -210,8 +237,223 @@ func (store *PostgresStore) GetLatestMetrics(deviceID string) (models.DeviceMetr
 	metrics.TemperatureC = floatPointer(temperatureC)
 	metrics.Latitude = floatPointer(latitude)
 	metrics.Longitude = floatPointer(longitude)
+	metrics.CabinNoiseRMS = floatPointer(cabinNoiseRMS)
+	metrics.GPSSignalQuality = stringValue(gpsSignalQuality)
+	metrics.SpeedKmh = floatPointer(speedKmh)
+	metrics.AmbientLightLux = floatPointer(ambientLightLux)
+	metrics.ServerLatencyMs = intPointer(serverLatencyMs)
+	metrics.DeviceIPAddress = stringValue(deviceIPAddress)
+	metrics.Jolt = floatPointer(jolt)
 
 	return metrics, nil
+}
+
+func (store *PostgresStore) ListMetricsHistory(deviceID string, limit int) ([]models.DeviceMetricsRecord, error) {
+	if limit <= 0 {
+		limit = 50
+	}
+	if limit > 500 {
+		limit = 500
+	}
+
+	deviceRowID, err := store.resolveDeviceRowID(deviceID)
+	if err != nil {
+		if errors.Is(err, ErrDeviceNotFound) {
+			return nil, ErrMetricsNotFound
+		}
+		return nil, err
+	}
+
+	cutoff := store.retentionCutoff()
+	rows, err := store.db.Query(
+		`SELECT battery_level, signal_strength, network_type,
+		        temperature_c, latitude, longitude,
+		        cabin_noise_rms, gps_signal_quality, speed_kmh, ambient_light_lux,
+		        server_latency_ms, device_ip_address, jolt,
+		        recorded_at, received_at
+		 FROM android_telemetry
+		 WHERE device_id = $1 AND recorded_at >= $2
+		 ORDER BY recorded_at DESC, id DESC
+		 LIMIT $3`,
+		deviceRowID,
+		cutoff,
+		limit,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("query metrics history: %w", err)
+	}
+	defer rows.Close()
+
+	history := make([]models.DeviceMetricsRecord, 0)
+	for rows.Next() {
+		var metrics models.DeviceMetricsRecord
+		var batteryLevel sql.NullFloat64
+		var temperatureC sql.NullFloat64
+		var latitude sql.NullFloat64
+		var longitude sql.NullFloat64
+		var signalStrength sql.NullInt64
+		var networkType sql.NullString
+		var cabinNoiseRMS sql.NullFloat64
+		var gpsSignalQuality sql.NullString
+		var speedKmh sql.NullFloat64
+		var ambientLightLux sql.NullFloat64
+		var serverLatencyMs sql.NullInt64
+		var deviceIPAddress sql.NullString
+		var jolt sql.NullFloat64
+
+		if err := rows.Scan(
+			&batteryLevel,
+			&signalStrength,
+			&networkType,
+			&temperatureC,
+			&latitude,
+			&longitude,
+			&cabinNoiseRMS,
+			&gpsSignalQuality,
+			&speedKmh,
+			&ambientLightLux,
+			&serverLatencyMs,
+			&deviceIPAddress,
+			&jolt,
+			&metrics.RecordedAt,
+			&metrics.ReceivedAt,
+		); err != nil {
+			return nil, fmt.Errorf("scan metrics history: %w", err)
+		}
+
+		metrics.DeviceID = deviceID
+		metrics.BatteryLevel = floatPointer(batteryLevel)
+		metrics.SignalStrength = intPointer(signalStrength)
+		metrics.NetworkType = stringPointer(networkType)
+		metrics.TemperatureC = floatPointer(temperatureC)
+		metrics.Latitude = floatPointer(latitude)
+		metrics.Longitude = floatPointer(longitude)
+		metrics.CabinNoiseRMS = floatPointer(cabinNoiseRMS)
+		metrics.GPSSignalQuality = stringValue(gpsSignalQuality)
+		metrics.SpeedKmh = floatPointer(speedKmh)
+		metrics.AmbientLightLux = floatPointer(ambientLightLux)
+		metrics.ServerLatencyMs = intPointer(serverLatencyMs)
+		metrics.DeviceIPAddress = stringValue(deviceIPAddress)
+		metrics.Jolt = floatPointer(jolt)
+		history = append(history, metrics)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate metrics history: %w", err)
+	}
+	if len(history) == 0 {
+		return nil, ErrMetricsNotFound
+	}
+
+	return history, nil
+}
+
+func (store *PostgresStore) ListFrames(limit int) ([]models.FrameRecord, error) {
+	if limit <= 0 {
+		limit = 50
+	}
+	if limit > 200 {
+		limit = 200
+	}
+
+	cutoff := store.retentionCutoff()
+	rows, err := store.db.Query(
+		`SELECT si.id, d.mac_address, si.path, si.captured_at, si.received_at
+		 FROM stored_images si
+		 JOIN devices d ON d.id = si.device_id
+		 WHERE si.captured_at >= $1
+		 ORDER BY si.captured_at DESC, si.id DESC
+		 LIMIT $2`,
+		cutoff,
+		limit,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("list frames: %w", err)
+	}
+	defer rows.Close()
+
+	frames := make([]models.FrameRecord, 0)
+	for rows.Next() {
+		var frame models.FrameRecord
+		if err := rows.Scan(&frame.ID, &frame.DeviceID, &frame.Path, &frame.CapturedAt, &frame.ReceivedAt); err != nil {
+			return nil, fmt.Errorf("scan frame: %w", err)
+		}
+		frames = append(frames, frame)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate frames: %w", err)
+	}
+	return frames, nil
+}
+
+func (store *PostgresStore) GetFrameByID(imageID int64) (models.FrameRecord, error) {
+	var frame models.FrameRecord
+	cutoff := store.retentionCutoff()
+	err := store.db.QueryRow(
+		`SELECT si.id, d.mac_address, si.path, si.captured_at, si.received_at
+		 FROM stored_images si
+		 JOIN devices d ON d.id = si.device_id
+		 WHERE si.id = $1 AND si.captured_at >= $2`,
+		imageID,
+		cutoff,
+	).Scan(&frame.ID, &frame.DeviceID, &frame.Path, &frame.CapturedAt, &frame.ReceivedAt)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return models.FrameRecord{}, ErrFrameNotFound
+		}
+		return models.FrameRecord{}, fmt.Errorf("query frame by id: %w", err)
+	}
+	return frame, nil
+}
+
+func (store *PostgresStore) GetDeviceName(deviceID string) (string, error) {
+	var name string
+	err := store.db.QueryRow(
+		`SELECT device_name FROM devices
+		 WHERE mac_address = $1 OR device_name = $1 OR CAST(id AS TEXT) = $1
+		 LIMIT 1`,
+		deviceID,
+	).Scan(&name)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return "", ErrDeviceNotFound
+		}
+		return "", fmt.Errorf("query device name: %w", err)
+	}
+	return name, nil
+}
+
+func (store *PostgresStore) SaveDiagnosticAudio(deviceID, segmentID, path string, startMs, endMs int64, rmsPeak float64, linkedAlertID, mode string) error {
+	deviceRowID, err := store.resolveDeviceRowID(deviceID)
+	if err != nil {
+		return err
+	}
+
+	_, err = store.db.Exec(
+		`INSERT INTO diagnostic_audio (
+			device_id, segment_id, path, start_ms, end_ms, rms_peak, linked_alert_id, mode, received_at
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+		deviceRowID,
+		segmentID,
+		path,
+		startMs,
+		endMs,
+		rmsPeak,
+		nullIfEmpty(linkedAlertID),
+		nullIfEmpty(mode),
+		time.Now().UTC(),
+	)
+	if err != nil {
+		return fmt.Errorf("insert diagnostic audio: %w", err)
+	}
+	return nil
+}
+
+func stringValue(value sql.NullString) string {
+	if value.Valid {
+		return value.String
+	}
+	return ""
 }
 
 func (store *PostgresStore) CreateAction(action models.PhoneActionRecord) (models.PhoneActionRecord, error) {

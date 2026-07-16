@@ -58,15 +58,124 @@ type DeviceMetricsPayload struct {
 }
 
 type DeviceMetricsRecord struct {
-	DeviceID       string    `json:"device_id"`
-	BatteryLevel   *float64  `json:"battery_level_percent,omitempty"`
-	SignalStrength *int      `json:"signal_strength_dbm,omitempty"`
-	NetworkType    string    `json:"network_type,omitempty"`
-	TemperatureC   *float64  `json:"temperature_celsius,omitempty"`
-	Latitude       *float64  `json:"latitude,omitempty"`
-	Longitude      *float64  `json:"longitude,omitempty"`
-	RecordedAt     time.Time `json:"recorded_at"`
-	ReceivedAt     time.Time `json:"received_at"`
+	DeviceID           string    `json:"device_id"`
+	BatteryLevel       *float64  `json:"battery_level_percent,omitempty"`
+	SignalStrength     *int      `json:"signal_strength_dbm,omitempty"`
+	NetworkType        string    `json:"network_type,omitempty"`
+	TemperatureC       *float64  `json:"temperature_celsius,omitempty"`
+	Latitude           *float64  `json:"latitude,omitempty"`
+	Longitude          *float64  `json:"longitude,omitempty"`
+	CabinNoiseRMS      *float64  `json:"cabin_noise_rms,omitempty"`
+	GPSSignalQuality   string    `json:"gps_signal_quality,omitempty"`
+	SpeedKmh           *float64  `json:"speed_kmh,omitempty"`
+	AmbientLightLux    *float64  `json:"ambient_light_lux,omitempty"`
+	ServerLatencyMs    *int      `json:"server_latency_ms,omitempty"`
+	DeviceIPAddress    string    `json:"device_ip_address,omitempty"`
+	Jolt               *float64  `json:"jolt,omitempty"`
+	RecordedAt         time.Time `json:"recorded_at"`
+	ReceivedAt         time.Time `json:"received_at"`
+}
+
+type GPSLocation struct {
+	Latitude  float64 `json:"latitude"`
+	Longitude float64 `json:"longitude"`
+}
+
+// TelemetryPayload is the Android unified telemetry body (POST /telemetry).
+type TelemetryPayload struct {
+	DeviceID                 string       `json:"device_id" binding:"required"`
+	RecordedAt               time.Time    `json:"recorded_at"`
+	GPSLocation              *GPSLocation `json:"gps_location"`
+	GPSSignalQuality         string       `json:"gps_signal_quality"`
+	SpeedKmh                 float64      `json:"speed_kmh"`
+	NetworkSignalStrengthDbm int          `json:"network_signal_strength_dbm"`
+	NetworkType              string       `json:"network_type"`
+	CabinNoiseRMS            float64      `json:"cabin_noise_rms"`
+	BatteryTemperatureC      float64      `json:"battery_temperature_celsius"`
+	BatteryPercentage        int          `json:"battery_percentage"`
+	RearCameraFrameBase64    string       `json:"rear_camera_frame_base64"`
+	FrontCameraFrameBase64   string       `json:"front_camera_frame_base64"`
+	AmbientLightLux          float64      `json:"ambient_light_lux"`
+	ServerLatencyMs          int          `json:"server_latency_ms"`
+	DeviceIPAddress          string       `json:"device_ip_address"`
+}
+
+// DeviceTelemetrySnapshot is the web live dashboard shape (GET /devices/:id/telemetry).
+type DeviceTelemetrySnapshot struct {
+	DeviceID                   string    `json:"device_id"`
+	BatteryPercent             float64   `json:"battery_percent"`
+	BatteryTemperatureCelsius  float64   `json:"battery_temperature_celsius"`
+	NoiseDb                    float64   `json:"noise_db"`
+	Jolt                       float64   `json:"jolt"`
+	SignalStrength             float64   `json:"signal_strength"`
+	NetworkType                string    `json:"network_type"`
+	ServerPhoneLatencyMs       float64   `json:"server_phone_latency_ms"`
+	ServerWebLatencyMs         float64   `json:"server_web_latency_ms"`
+	RecordedAt                 time.Time `json:"recorded_at"`
+}
+
+type MetricReading struct {
+	Timestamp           time.Time `json:"timestamp"`
+	TemperatureCelsius  float64   `json:"temperature_celsius"`
+	NoiseDb             float64   `json:"noise_db"`
+}
+
+type DeviceMetricsHistory struct {
+	DeviceID   string `json:"device_id"`
+	DeviceName string `json:"device_name"`
+	Current    struct {
+		TemperatureCelsius float64   `json:"temperature_celsius"`
+		NoiseDb            float64   `json:"noise_db"`
+		RecordedAt         time.Time `json:"recorded_at"`
+	} `json:"current"`
+	History []MetricReading `json:"history"`
+}
+
+type CaptureResponse struct {
+	ImageID    string    `json:"image_id"`
+	URL        string    `json:"url,omitempty"`
+	CapturedAt time.Time `json:"captured_at"`
+}
+
+type GalleryImage struct {
+	ID           string    `json:"id"`
+	URL          string    `json:"url"`
+	ThumbnailURL string    `json:"thumbnail_url,omitempty"`
+	Caption      string    `json:"caption,omitempty"`
+	CapturedAt   time.Time `json:"captured_at"`
+	DeviceID     string    `json:"device_id,omitempty"`
+}
+
+type SoundManifestEntry struct {
+	ID        string `json:"id"`
+	URL       string `json:"url"`
+	SHA256    string `json:"sha256"`
+	AlertType string `json:"alert_type"`
+	Format    string `json:"format"`
+}
+
+type DiagnosticAudioMetadata struct {
+	SegmentID     string  `json:"segment_id"`
+	StartMs       int64   `json:"start_ms"`
+	EndMs         int64   `json:"end_ms"`
+	RMSPeak       float64 `json:"rms_peak"`
+	LinkedAlertID string  `json:"linked_alert_id"`
+	Mode          string  `json:"mode"`
+	DeviceID      string  `json:"device_id"`
+}
+
+type WebSettingsPayload struct {
+	NotificationsEnabled   *bool    `json:"notifications_enabled"`
+	TemperatureUnit        *string  `json:"temperature_unit"`
+	NoiseAlertThresholdDb  *float64 `json:"noise_alert_threshold_db"`
+	DefaultDeviceID        *string  `json:"default_device_id"`
+}
+
+type WebSettingsResponse struct {
+	NotificationsEnabled  bool    `json:"notifications_enabled"`
+	TemperatureUnit       string  `json:"temperature_unit"`
+	NoiseAlertThresholdDb float64 `json:"noise_alert_threshold_db"`
+	DefaultDeviceID       string  `json:"default_device_id,omitempty"`
 }
 
 type PhoneActionPayload struct {
