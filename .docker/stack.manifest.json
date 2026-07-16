@@ -1,0 +1,9 @@
+{
+  "stackName": "dogan",
+  "containerName": "dogan-server",
+  "apiContainerName": "dogan-server",
+  "internalPort": "8080",
+  "apiImageTag": "dogan-server:latest",
+  "apiPublishPort": "8080",
+  "dockerNetwork": "dogan-net"
+}
