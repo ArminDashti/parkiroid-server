@@ -1,3 +1,5 @@
+# API host port publishing is optional. Behind sslh/nginx on the same Docker network,
+# set DOGAN_PUBLISH_PORT= (empty) so the API is reachable only on DOCKER_NETWORK.
 services:
   postgres:
     image: postgres:16-alpine
@@ -6,9 +8,13 @@ services:
       POSTGRES_USER: dogan
       POSTGRES_PASSWORD: dogan
     ports:
-      - "${POSTGRES_HOST_PORT:-5432}:5432"
+      - target: 5432
+        published: ${POSTGRES_PUBLISH_PORT-5432}
+        protocol: tcp
     volumes:
       - dogan-postgres-data:/var/lib/postgresql/data
+    networks:
+      - dogan-net
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U dogan -d dogan"]
       interval: 5s
@@ -25,20 +31,27 @@ services:
       - "${LIVEKIT_RTC_UDP_PORT:-7882}:7882/udp"
     volumes:
       - ./livekit.yaml:/etc/livekit.yaml:ro
+    networks:
+      - dogan-net
     restart: unless-stopped
 
   dogan-server:
     build:
       context: .
       dockerfile: Dockerfile
-    image: dogan-server:latest
+    image: ${API_IMAGE_TAG:-dogan-server:latest}
+    container_name: ${API_CONTAINER_NAME:-dogan-server}
     depends_on:
       postgres:
         condition: service_healthy
       livekit:
         condition: service_started
+    expose:
+      - "8080"
     ports:
-      - "${DOGAN_HOST_PORT:-8080}:8080"
+      - target: 8080
+        published: ${DOGAN_PUBLISH_PORT-8080}
+        protocol: tcp
     environment:
       DOGAN_LISTEN_ADDRESS: ":8080"
       DOGAN_EMBEDDED_API_TOKEN: ${DOGAN_EMBEDDED_API_TOKEN:-dg_dev_a8f3c2e1b9d74f6a0e5c3b9d2f7a1e4c8b6d0f3a7e2c9b5d1f8a4e6c0b3d7f9}
@@ -55,7 +68,13 @@ services:
       DOGAN_LIVEKIT_TOKEN_TTL: ${DOGAN_LIVEKIT_TOKEN_TTL:-3600}
     volumes:
       - dogan-data:/data
+    networks:
+      - dogan-net
     restart: unless-stopped
+
+networks:
+  dogan-net:
+    name: ${DOCKER_NETWORK:-dogan-net}
 
 volumes:
   dogan-postgres-data:
