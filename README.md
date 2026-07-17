@@ -7,11 +7,19 @@ Go API server for Dogan Android/Web clients: REST image and telemetry transfer, 
 Build and run with Docker Compose (includes PostgreSQL and LiveKit):
 
 ```powershell
-.\build-docker-image.ps1
-docker compose up -d
+.\create-image.ps1
+.\run-on-docker-local.ps1
 ```
 
-The API listens on port `8080` by default. PostgreSQL on `5432`. LiveKit on `7880`.
+Remote over SSH (config alias only):
+
+```powershell
+.\run-on-docker-server.ps1 --ssh-string=<alias>
+```
+
+Local API host port defaults to `8080` (override with `--internal-port`). PostgreSQL uses a free high port locally. LiveKit on `7880`.
+
+Compat: `build-docker-image.ps1` and `run-on-docker.ps1` still work; prefer the scripts above.
 
 Login credentials for the web app are in `armin-credentials.txt` (generated locally, gitignored).
 
@@ -30,6 +38,8 @@ See `endpoints.md` for the endpoint list.
 Base path: `/dogan/api/v1`
 
 Health check: `GET http://localhost:8080/dogan/api/v1/health`
+
+Browser web UI (e.g. `http://localhost:30808`) needs CORS. Defaults allow local web ports and `https://dogan.xaigrok.ir`. Override with `DOGAN_CORS_ALLOWED_ORIGINS`, or pass `--domain` on remote deploy to add `https://<domain>`.
 
 Test with dummy data after Docker is running:
 

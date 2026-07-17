@@ -91,6 +91,8 @@ CREATE TABLE IF NOT EXISTS android_telemetry (
 	server_latency_ms INTEGER,
 	device_ip_address TEXT,
 	jolt DOUBLE PRECISION,
+	cpu_usage_percent DOUBLE PRECISION,
+	ram_usage_percent DOUBLE PRECISION,
 	recorded_at TIMESTAMPTZ NOT NULL,
 	received_at TIMESTAMPTZ NOT NULL
 );
@@ -128,4 +130,6 @@ ALTER TABLE android_telemetry ADD COLUMN IF NOT EXISTS ambient_light_lux DOUBLE 
 ALTER TABLE android_telemetry ADD COLUMN IF NOT EXISTS server_latency_ms INTEGER;
 ALTER TABLE android_telemetry ADD COLUMN IF NOT EXISTS device_ip_address TEXT;
 ALTER TABLE android_telemetry ADD COLUMN IF NOT EXISTS jolt DOUBLE PRECISION;
+ALTER TABLE android_telemetry ADD COLUMN IF NOT EXISTS cpu_usage_percent DOUBLE PRECISION;
+ALTER TABLE android_telemetry ADD COLUMN IF NOT EXISTS ram_usage_percent DOUBLE PRECISION;
 `

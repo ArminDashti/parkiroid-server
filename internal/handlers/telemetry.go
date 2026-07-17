@@ -62,6 +62,8 @@ func (handler *TelemetryHandler) SubmitTelemetry(context *gin.Context) {
 		AmbientLightLux:  &ambient,
 		ServerLatencyMs:  &latency,
 		DeviceIPAddress:  payload.DeviceIPAddress,
+		CPUUsagePercent:  payload.CPUUsagePercent,
+		RAMUsagePercent:  payload.RAMUsagePercent,
 		RecordedAt:       recordedAt,
 		ReceivedAt:       time.Now().UTC(),
 	}

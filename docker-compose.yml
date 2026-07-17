@@ -1,50 +1,51 @@
-# API host port publishing is optional. Behind sslh/nginx on the same Docker network,
-# set DOGAN_PUBLISH_PORT= (empty) so the API is reachable only on DOCKER_NETWORK.
+name: dogan
+
 services:
-  postgres:
+  dogan-pgsql:
     image: postgres:16-alpine
+    container_name: dogan-pgsql
     environment:
       POSTGRES_DB: dogan
       POSTGRES_USER: dogan
       POSTGRES_PASSWORD: dogan
-    ports:
-      - target: 5432
-        published: ${POSTGRES_PUBLISH_PORT-5432}
-        protocol: tcp
     volumes:
-      - dogan-postgres-data:/var/lib/postgresql/data
+      - dogan-pgsql-vol:/var/lib/postgresql/data
     networks:
-      - dogan-net
+      - t3-net
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U dogan -d dogan"]
       interval: 5s
       timeout: 3s
       retries: 10
     restart: unless-stopped
+    expose:
+      - "5432"
 
-  livekit:
+  dogan-livekit:
     image: livekit/livekit-server:latest
+    container_name: dogan-livekit
     command: --config /etc/livekit.yaml
-    ports:
-      - "${LIVEKIT_HOST_PORT:-7880}:7880"
-      - "${LIVEKIT_RTC_TCP_PORT:-7881}:7881"
-      - "${LIVEKIT_RTC_UDP_PORT:-7882}:7882/udp"
     volumes:
       - ./livekit.yaml:/etc/livekit.yaml:ro
+      - dogan-livekit-vol:/data
     networks:
-      - dogan-net
+      - t3-net
     restart: unless-stopped
+    expose:
+      - "7880"
+      - "7881"
+      - "7882"
 
-  dogan-server:
+  dogan-api:
     build:
       context: .
       dockerfile: Dockerfile
-    image: ${API_IMAGE_TAG:-dogan-server:latest}
-    container_name: ${API_CONTAINER_NAME:-dogan-server}
+    image: ${API_IMAGE_TAG:-dogan-api:latest}
+    container_name: dogan-api
     depends_on:
-      postgres:
+      dogan-pgsql:
         condition: service_healthy
-      livekit:
+      dogan-livekit:
         condition: service_started
     expose:
       - "8080"
@@ -58,24 +59,30 @@ services:
       DOGAN_DEVICE_API_KEY: ${DOGAN_DEVICE_API_KEY:-dogan-dev-key}
       DOGAN_JWT_SECRET: ${DOGAN_JWT_SECRET:-dogan-dev-jwt-secret}
       DOGAN_TOKEN_TTL: ${DOGAN_TOKEN_TTL:-86400}
-      DOGAN_DATABASE_URL: postgres://dogan:dogan@postgres:5432/dogan?sslmode=disable
+      DOGAN_DATABASE_URL: postgres://dogan:dogan@dogan-pgsql:5432/dogan?sslmode=disable
       DOGAN_FRAMES_DIR: /data/frames
       DOGAN_MODELS_DIR: /data/models
-      DOGAN_LIVEKIT_URL: ${DOGAN_LIVEKIT_URL:-ws://livekit:7880}
-      DOGAN_LIVEKIT_PUBLIC_URL: ${DOGAN_LIVEKIT_PUBLIC_URL:-ws://localhost:7880}
+      DOGAN_LIVEKIT_URL: ${DOGAN_LIVEKIT_URL:-ws://dogan-livekit:7880}
+      DOGAN_LIVEKIT_PUBLIC_URL: ${DOGAN_LIVEKIT_PUBLIC_URL:-wss://dogan-livekit.xaigrok.ir}
       DOGAN_LIVEKIT_API_KEY: ${DOGAN_LIVEKIT_API_KEY:-devkey}
       DOGAN_LIVEKIT_API_SECRET: ${DOGAN_LIVEKIT_API_SECRET:-secret}
       DOGAN_LIVEKIT_TOKEN_TTL: ${DOGAN_LIVEKIT_TOKEN_TTL:-3600}
+      DOGAN_CORS_ALLOWED_ORIGINS: ${DOGAN_CORS_ALLOWED_ORIGINS:-http://localhost:30808,http://127.0.0.1:30808,https://dogan.xaigrok.ir}
     volumes:
-      - dogan-data:/data
+      - dogan-api-vol:/data
     networks:
-      - dogan-net
+      - t3-net
     restart: unless-stopped
 
 networks:
-  dogan-net:
-    name: ${DOCKER_NETWORK:-dogan-net}
+  t3-net:
+    name: ${DOCKER_NETWORK:-t3-net}
+    external: true
 
 volumes:
-  dogan-postgres-data:
-  dogan-data:
+  dogan-pgsql-vol:
+    name: dogan-pgsql-vol
+  dogan-api-vol:
+    name: dogan-api-vol
+  dogan-livekit-vol:
+    name: dogan-livekit-vol

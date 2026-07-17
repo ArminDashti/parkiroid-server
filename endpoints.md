@@ -52,7 +52,7 @@ JSON wire format is **snake_case** unless noted. Bearer token required except wh
 
 ### POST /telemetry (Android)
 
-`device_id`, `recorded_at`, `gps_location`, `gps_signal_quality`, `speed_kmh`, `network_signal_strength_dbm`, `network_type`, `cabin_noise_rms`, `battery_temperature_celsius`, `battery_percentage`, `rear_camera_frame_base64`, `front_camera_frame_base64`, `ambient_light_lux`, `server_latency_ms`, `device_ip_address`
+`device_id`, `recorded_at`, `gps_location`, `gps_signal_quality`, `speed_kmh`, `network_signal_strength_dbm`, `network_type`, `cabin_noise_rms`, `battery_temperature_celsius`, `battery_percentage`, `rear_camera_frame_base64`, `front_camera_frame_base64`, `ambient_light_lux`, `server_latency_ms`, `device_ip_address`, `cpu_usage_percent`, `ram_usage_percent` (optional floats, 0–100)
 
 ### GET /devices/:id/telemetry (web)
 
