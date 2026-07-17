@@ -48,6 +48,14 @@ JSON wire format is **snake_case** unless noted. Bearer token required except wh
 - **Web:** `VITE_API_BASE_URL` = `http://host:8080/dogan/api/v1`
 - **Android:** server base URL must include `/dogan` (e.g. `http://host:8080/dogan`); client appends `/api/v1/...`
 
+## CORS
+
+Cross-origin browser calls (e.g. web UI on `:30808` → API on `:8080`) require an allowed origin. Set `DOGAN_CORS_ALLOWED_ORIGINS` (comma-separated).
+
+Default: `http://localhost:30808,http://127.0.0.1:30808,https://dogan.xaigrok.ir`.
+
+Remote deploy with `--domain=<host>` also injects `https://<host>` into that list. OPTIONS preflight is handled by Gin CORS middleware.
+
 ## Key payload notes
 
 ### POST /telemetry (Android)

@@ -1,10 +1,10 @@
 <#
 .SYNOPSIS
-    Build and run the dogan-server stack with Docker Compose locally or over SSH.
+    Build and run the dogan-api stack with Docker Compose locally or over SSH.
 
 .DESCRIPTION
     Uses the repo-root Dockerfile, docker-compose.yml, and livekit.yaml.
-    Builds the API image, then starts PostgreSQL, LiveKit, and dogan-server.
+    Builds the API image, then starts PostgreSQL, LiveKit, and dogan-api.
     When --ssh-string is omitted, the local Docker daemon is used. When --ssh-string
     is set, the API image is built locally, exported, transferred to the remote host,
     loaded there, and compose is started without a remote build. When --delete-volume=yes,
@@ -27,10 +27,23 @@
     Public hostname to route to the API container through nginx on the remote host.
 
 .PARAMETER InternalPort
-    Container port used for domain routing. Default: 8080 (dogan-server).
+    Host port mapped to the API (default: 8080 from stack manifest).
+    Remote with --domain: container port for domain routing (default: 8080).
+
+.PARAMETER VolumeDir
+    Deploy/data directory. Default: <USER-PROFILE-NAME>/docker/dogan-api.
+
+.PARAMETER VolumeName
+    Named volume label (default: dogan-api-vol). Compose still uses dogan-data / dogan-postgres-data.
+
+.PARAMETER NetworkName
+    Docker network name. Default: t3-net from stack manifest.
 
 .PARAMETER PublicPort
     Public HTTPS port for sslh/nginx. Default: 443.
+
+.PARAMETER Mode
+    local or server (set by run-on-docker-local.ps1 / run-on-docker-server.ps1).
 
 .EXAMPLE
     .\run-on-docker.ps1
@@ -49,17 +62,24 @@ param(
     [Alias('ssh-string')]
     [string]$SshString,
     [Alias('delete-image')]
-    [string]$DeleteImage = 'no',
+    [string]$DeleteImage,
     [Alias('delete-volume')]
-    [string]$DeleteVolume = 'no',
+    [string]$DeleteVolume,
     [Alias('reverse-proxy')]
     [string]$ReverseProxy = 'sslh',
     [Alias('domain')]
     [string]$DomainName,
     [Alias('internal-port')]
     [string]$InternalPort,
+    [Alias('volume-dir')]
+    [string]$VolumeDir,
+    [Alias('volume-name')]
+    [string]$VolumeName,
+    [Alias('network-name')]
+    [string]$NetworkName,
     [Alias('public-port')]
     [string]$PublicPort = '443',
+    [string]$DeployMode,
     [switch]$Help,
     [Parameter(ValueFromRemainingArguments = $true)]
     [string[]]$RemainingArguments
@@ -81,43 +101,42 @@ $Script:DeploySyncFiles = @(
 
 function Show-RunOnDockerHelp {
     Write-Host @'
-dogan-server Docker run - build API image and start the Compose stack
+run-on-docker.ps1 - build and deploy dogan-api in Docker (engine)
 
-Usage:
-  .\run-on-docker.ps1 [--ssh-string=<alias>] [--delete-image=<no|yes>] [--delete-volume=<no|yes>]
-                      [--reverse-proxy=<sslh|none>] [--domain=<hostname>] [--internal-port=<port>]
-                      [--public-port=<port>] [--help]
+USAGE:
+  .\run-on-docker.ps1 [flags]
 
-Arguments:
-  --ssh-string=<alias>        SSH config alias for remote Docker (e.g. example)
-                              The script prepends "ssh" when connecting; do not include "ssh"
-                              in the value. Builds the API image locally, transfers it to the server,
-                              then starts compose remotely. When omitted, localhost Docker is used.
-  --delete-image=<no|yes>     Remove built images during stack teardown (default: no)
-  --delete-volume=<no|yes>    Remove named volumes before starting (default: no)
-  --reverse-proxy=<sslh|none> Reverse-proxy mode (default: sslh)
-                              sslh: no API host port on remote deploy (use Docker network)
-                              none: publish host ports (8080 API, 5432 Postgres, 7880 LiveKit locally)
-  --domain=<hostname>         Map this hostname to the API container via remote nginx
-                              Requires --ssh-string. Creates an nginx site and reloads nginx.
-  --internal-port=<port>      Container port for domain routing (default: 8080)
-  --public-port=<port>        Public HTTPS port for sslh/nginx (default: 443)
-  --help, -h                  Show this help message and exit
+Prefer entry scripts:
+  .\run-on-docker-local.ps1
+  .\run-on-docker-server.ps1 --ssh-string=<alias>
 
-Examples:
+FLAGS:
+  --ssh-string=<alias>       SSH alias; null -> local daemon (default: null)
+  --delete-image=<no|yes>    Remove built images during teardown (default: null -> no)
+  --delete-volume=<no|yes>   Remove volumes before recreate (default: null -> no)
+  --internal-port=<port>     Host/API port (default: null -> 8080 from manifest)
+  --volume-dir=<path>        Deploy data directory (default: null -> <USER>/docker/dogan-api)
+  --volume-name=<name>       Volume label (default: null -> dogan-api-vol)
+  --network-name=<name>      Docker network (default: null -> t3-net from manifest)
+  --reverse-proxy=<sslh|none> Remote reverse-proxy mode (default: sslh)
+  --domain=<hostname>        Remote hostname mapping (requires --ssh-string); also adds https://<hostname> to CORS
+  --public-port=<port>       Public HTTPS port (default: 443)
+  --mode=<local|server>      Deploy mode hint from wrapper scripts (also -DeployMode)
+  --help                     Show this help
+
+EXAMPLES:
   .\run-on-docker.ps1
-  .\run-on-docker.ps1 --help
   .\run-on-docker.ps1 --delete-volume=yes
-  .\run-on-docker.ps1 --ssh-string=example --delete-image=no --delete-volume=no
-  .\run-on-docker.ps1 --ssh-string=example --domain=dogan.example.com --internal-port=8080
-  .\run-on-docker.ps1 --ssh-string=example --reverse-proxy=sslh --domain=dogan.example.com --public-port=443
+  .\run-on-docker.ps1 --internal-port=8080
+  .\run-on-docker.ps1 --ssh-string=myserver --domain=dogan.xaigrok.ir
 
-Remote deploy (--ssh-string): builds the API image locally, exports it, uploads to the
-server, loads it there, and starts compose without a remote build.
-
-Requires docker-compose.yml, Dockerfile, and livekit.yaml in the repo root.
-Local: API http://localhost:8080  |  Postgres localhost:5432  |  LiveKit ws://localhost:7880
-Remote with --domain: https://<domain> (routed to dogan-server on Docker network)
+NOTES:
+  - Use SSH config alias only; do not include "ssh" in --ssh-string.
+  - Null defaults resolve as described in FLAGS.
+  - Truthy values for yes/no flags: yes, true, 1, y, on.
+  - Default API host port is 8080 (from .docker/stack.manifest.json) if not specified.
+  - CORS defaults include local web (:30808) and https://dogan.xaigrok.ir; --domain appends https://<domain>.
+  - Image build uses create-image.ps1 when present; otherwise docker compose build.
 '@ -ForegroundColor Cyan
 }
 
@@ -228,7 +247,7 @@ function Write-RunStep {
     )
 
     $percent = [math]::Round(($Step / $Total) * 100)
-    Write-Progress -Activity 'dogan-server Docker run' -Status $Message -PercentComplete $percent
+    Write-Progress -Activity 'dogan-api Docker run' -Status $Message -PercentComplete $percent
     Write-Host ("[{0}/{1}] {2}" -f $Step, $Total, $Message) -ForegroundColor Yellow
 }
 
@@ -369,7 +388,7 @@ function Get-StackManifest {
 function Get-StackImageTag {
     param([string]$ProjectRoot)
 
-    $imageTag = 'dogan-server:latest'
+    $imageTag = 'dogan-api:latest'
     $manifest = Get-StackManifest -ProjectRoot $ProjectRoot
     if ($manifest) {
         if ($manifest.apiImageTag) { $imageTag = [string]$manifest.apiImageTag }
@@ -385,11 +404,26 @@ function Get-ImageArchiveName {
 }
 
 function Build-LocalDockerImages {
-    param([string]$ProjectRoot)
+    param(
+        [string]$ProjectRoot,
+        [string]$ImageTag = $null
+    )
+
+    $createImageScript = Join-Path $ProjectRoot 'create-image.ps1'
+    if (Test-Path $createImageScript) {
+        $buildArgs = @()
+        if (-not [string]::IsNullOrWhiteSpace($ImageTag) -and $ImageTag -match '^(?<name>[^:]+):(?<tag>.+)$') {
+            $buildArgs += "--image-name=$($Matches['name'])"
+            $buildArgs += "--tag=$($Matches['tag'])"
+        }
+        & $createImageScript @buildArgs
+        if ($LASTEXITCODE -ne 0) { throw "create-image.ps1 failed (exit $LASTEXITCODE)" }
+        return
+    }
 
     Push-Location $ProjectRoot
     try {
-        & docker compose -f $Script:ComposeFile build dogan-server
+        & docker compose -p dogan -f $Script:ComposeFile build dogan-api
         if ($LASTEXITCODE -ne 0) { throw "docker compose build failed (exit $LASTEXITCODE)" }
     }
     finally {
@@ -469,23 +503,73 @@ function Test-ReverseProxyMode {
     throw "Invalid --reverse-proxy value '$Value'. Allowed: sslh, none."
 }
 
+function Get-DefaultVolumeDir {
+    param([string]$ContainerName)
+
+    $userName = if ($env:USERNAME) { $env:USERNAME } elseif ($env:USER) { $env:USER } else { 'user' }
+    $isWindowsHost = ($env:OS -match 'Windows') -or (-not [string]::IsNullOrWhiteSpace($env:USERPROFILE) -and $env:USERPROFILE -match '^[A-Za-z]:\\')
+    if ($isWindowsHost) {
+        return (Join-Path $env:USERPROFILE "docker\$ContainerName")
+    }
+    return "/$userName/docker/$ContainerName"
+}
+
+function Get-UnusedSafePort {
+    param([int[]]$ExcludePorts = @())
+
+    $min = 30000
+    $max = 32767
+    $used = @{}
+    foreach ($excluded in @($ExcludePorts)) {
+        if ($excluded -gt 0) { $used[$excluded] = $true }
+    }
+
+    try {
+        Get-NetTCPConnection -ErrorAction SilentlyContinue |
+            ForEach-Object { $used[[int]$_.LocalPort] = $true }
+    }
+    catch {
+        $netstat = & netstat -ano 2>$null
+        foreach ($line in @($netstat)) {
+            if ($line -match ':(\d+)\s') {
+                $used[[int]$Matches[1]] = $true
+            }
+        }
+    }
+
+    for ($attempt = 0; $attempt -lt 200; $attempt++) {
+        $candidate = Get-Random -Minimum $min -Maximum ($max + 1)
+        if (-not $used.ContainsKey($candidate)) {
+            return [string]$candidate
+        }
+    }
+
+    throw 'Could not find a free port in range 30000-32767.'
+}
+
 function Resolve-RemoteWorkDir {
     param(
         [string]$ProjectRoot,
         [pscustomobject]$Target,
-        [string]$ContainerName
+        [string]$ContainerName,
+        [string]$VolumeDir = $null
     )
 
     if ($Target.IsLocal) {
         return $ProjectRoot
     }
 
-    $username = Invoke-RemoteCommand -Target $Target -Command 'whoami'
-    if ([string]::IsNullOrWhiteSpace($username)) {
-        throw 'Failed to resolve remote username for remote work directory.'
+    $manifest = Get-StackManifest -ProjectRoot $ProjectRoot
+    if ($manifest -and $manifest.remoteWorkDir) {
+        return ([string]$manifest.remoteWorkDir).TrimEnd('/')
     }
 
-    return "/$username/docker/$ContainerName"
+    if (-not [string]::IsNullOrWhiteSpace($VolumeDir)) {
+        return ($VolumeDir -replace '\\', '/').TrimEnd('/')
+    }
+
+    $stackName = if ($manifest -and $manifest.stackName) { [string]$manifest.stackName } else { 'dogan' }
+    return "/cloud-admin/docker/$stackName"
 }
 
 function Get-SslhRuntimeInfo {
@@ -689,11 +773,11 @@ function Get-DockerManifestDefaults {
     param([string]$ProjectRoot)
 
     $defaults = @{
-        ApiHost           = 'dogan-server'
+        ApiHost           = 'dogan-api'
         ApiPort           = '8080'
-        ApiContainerName  = 'dogan-server'
-        ContainerName     = 'dogan-server'
-        DockerNetwork     = 'dogan-net'
+        ApiContainerName  = 'dogan-api'
+        ContainerName     = 'dogan-api'
+        DockerNetwork     = 't3-net'
     }
 
     $manifest = Get-StackManifest -ProjectRoot $ProjectRoot
@@ -719,23 +803,67 @@ function Get-DockerManifestDefaults {
     return $defaults
 }
 
+function Get-CorsAllowedOrigins {
+    param([string]$DomainName = $null)
+
+    $origins = [System.Collections.Generic.List[string]]::new()
+    foreach ($origin in @(
+            'http://localhost:30808',
+            'http://127.0.0.1:30808',
+            'https://dogan.xaigrok.ir'
+        )) {
+        $origins.Add($origin)
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace($DomainName)) {
+        $domainOrigin = "https://$($DomainName.Trim().TrimEnd('/'))"
+        if (-not ($origins -contains $domainOrigin)) {
+            $origins.Add($domainOrigin)
+        }
+    }
+
+    return ($origins -join ',')
+}
+
 function Set-ComposeEnvironment {
     param(
         [string]$NetworkName,
         [string]$ApiImageTag,
         [string]$ApiContainerName,
-        [bool]$PublishApiHostPort = $true
+        [bool]$PublishApiHostPort = $true,
+        [string]$HostApiPort = $null,
+        [string]$HostPostgresPort = $null,
+        [string]$CorsAllowedOrigins = $null
     )
 
     $env:DOCKER_NETWORK = $NetworkName
     $env:API_IMAGE_TAG = $ApiImageTag
     $env:API_CONTAINER_NAME = $ApiContainerName
 
+    if (-not [string]::IsNullOrWhiteSpace($CorsAllowedOrigins)) {
+        $env:DOGAN_CORS_ALLOWED_ORIGINS = $CorsAllowedOrigins
+    }
+    else {
+        Remove-Item Env:DOGAN_CORS_ALLOWED_ORIGINS -ErrorAction SilentlyContinue
+    }
+
     if ($PublishApiHostPort) {
-        Remove-Item Env:DOGAN_PUBLISH_PORT -ErrorAction SilentlyContinue
+        if (-not [string]::IsNullOrWhiteSpace($HostApiPort)) {
+            $env:DOGAN_PUBLISH_PORT = $HostApiPort
+        }
+        else {
+            Remove-Item Env:DOGAN_PUBLISH_PORT -ErrorAction SilentlyContinue
+        }
+        if (-not [string]::IsNullOrWhiteSpace($HostPostgresPort)) {
+            $env:POSTGRES_PUBLISH_PORT = $HostPostgresPort
+        }
+        else {
+            Remove-Item Env:POSTGRES_PUBLISH_PORT -ErrorAction SilentlyContinue
+        }
     }
     else {
         $env:DOGAN_PUBLISH_PORT = ''
+        $env:POSTGRES_PUBLISH_PORT = ''
     }
 }
 
@@ -744,12 +872,27 @@ function Get-RemoteComposeEnvironmentPrefix {
         [string]$NetworkName,
         [string]$ApiImageTag,
         [string]$ApiContainerName,
-        [bool]$PublishApiHostPort = $false
+        [bool]$PublishApiHostPort = $false,
+        [string]$HostApiPort = $null,
+        [string]$HostPostgresPort = $null,
+        [string]$CorsAllowedOrigins = $null
     )
 
     $prefix = "DOCKER_NETWORK='$NetworkName' API_IMAGE_TAG='$ApiImageTag' API_CONTAINER_NAME='$ApiContainerName' "
+    if (-not [string]::IsNullOrWhiteSpace($CorsAllowedOrigins)) {
+        $safeCors = $CorsAllowedOrigins.Replace("'", "'\''")
+        $prefix += "DOGAN_CORS_ALLOWED_ORIGINS='$safeCors' "
+    }
     if (-not $PublishApiHostPort) {
-        $prefix += "DOGAN_PUBLISH_PORT='' "
+        $prefix += "DOGAN_PUBLISH_PORT='' POSTGRES_PUBLISH_PORT='' "
+    }
+    else {
+        if (-not [string]::IsNullOrWhiteSpace($HostApiPort)) {
+            $prefix += "DOGAN_PUBLISH_PORT='$HostApiPort' "
+        }
+        if (-not [string]::IsNullOrWhiteSpace($HostPostgresPort)) {
+            $prefix += "POSTGRES_PUBLISH_PORT='$HostPostgresPort' "
+        }
     }
     return $prefix
 }
@@ -783,19 +926,22 @@ function Invoke-ComposeStack {
         [string]$NetworkName,
         [string]$ApiImageTag,
         [string]$ApiContainerName,
-        [bool]$PublishApiHostPort
+        [bool]$PublishApiHostPort,
+        [string]$HostApiPort = $null,
+        [string]$HostPostgresPort = $null,
+        [string]$CorsAllowedOrigins = $null
     )
 
     $downFlag = if ($RemoveVolumes) { ' -v' } else { '' }
     $rmiFlag = if ($RemoveImages) { ' --rmi local' } else { '' }
-    $composeDown = "docker compose -f $Script:ComposeFile down$rmiFlag$downFlag"
+    $composeDown = "docker compose -p dogan -f $Script:ComposeFile down$rmiFlag$downFlag"
     $buildFlag = if ($Build) { ' --build' } else { '' }
-    $composeUp = "docker compose -f $Script:ComposeFile up -d$buildFlag"
+    $composeUp = "docker compose -p dogan -f $Script:ComposeFile up -d$buildFlag"
 
     if ($Target.IsLocal) {
         Push-Location $WorkingDirectory
         try {
-            Set-ComposeEnvironment -NetworkName $NetworkName -ApiImageTag $ApiImageTag -ApiContainerName $ApiContainerName -PublishApiHostPort:$PublishApiHostPort
+            Set-ComposeEnvironment -NetworkName $NetworkName -ApiImageTag $ApiImageTag -ApiContainerName $ApiContainerName -PublishApiHostPort:$PublishApiHostPort -HostApiPort $HostApiPort -HostPostgresPort $HostPostgresPort -CorsAllowedOrigins $CorsAllowedOrigins
             Invoke-Expression $composeDown | Out-Null
             if ($LASTEXITCODE -ne 0) {
                 Write-Host 'Compose down skipped or partial (stack may not exist yet).' -ForegroundColor DarkYellow
@@ -816,7 +962,7 @@ function Invoke-ComposeStack {
         Write-Host "Compose down skipped: $($_.Exception.Message)" -ForegroundColor DarkYellow
     }
 
-    $envPrefix = Get-RemoteComposeEnvironmentPrefix -NetworkName $NetworkName -ApiImageTag $ApiImageTag -ApiContainerName $ApiContainerName -PublishApiHostPort:$PublishApiHostPort
+    $envPrefix = Get-RemoteComposeEnvironmentPrefix -NetworkName $NetworkName -ApiImageTag $ApiImageTag -ApiContainerName $ApiContainerName -PublishApiHostPort:$PublishApiHostPort -HostApiPort $HostApiPort -HostPostgresPort $HostPostgresPort -CorsAllowedOrigins $CorsAllowedOrigins
     Invoke-RemoteShell -Target $Target -Command "${envPrefix}$composeUp" -WorkingDirectory $WorkingDirectory
 }
 
@@ -835,9 +981,9 @@ if ($cliArgs['help']) {
 
 $sshStringValue = if ($cliArgs['ssh_string']) { [string]$cliArgs['ssh_string'] } else { [string]$SshString }
 $sshStringValue = Normalize-CliParameterValue -Name 'ssh_string' -Value $sshStringValue
-$deleteImageValue = if ($cliArgs['delete_image']) { [string]$cliArgs['delete_image'] } else { [string]$DeleteImage }
+$deleteImageValue = if ($cliArgs['delete_image']) { [string]$cliArgs['delete_image'] } elseif (-not [string]::IsNullOrWhiteSpace($DeleteImage)) { [string]$DeleteImage } else { 'no' }
 $deleteImageValue = Normalize-CliParameterValue -Name 'delete_image' -Value $deleteImageValue
-$deleteVolumeValue = if ($cliArgs['delete_volume']) { [string]$cliArgs['delete_volume'] } else { [string]$DeleteVolume }
+$deleteVolumeValue = if ($cliArgs['delete_volume']) { [string]$cliArgs['delete_volume'] } elseif (-not [string]::IsNullOrWhiteSpace($DeleteVolume)) { [string]$DeleteVolume } else { 'no' }
 $deleteVolumeValue = Normalize-CliParameterValue -Name 'delete_volume' -Value $deleteVolumeValue
 $reverseProxyValue = if ($cliArgs['reverse_proxy']) { [string]$cliArgs['reverse_proxy'] } else { [string]$ReverseProxy }
 $reverseProxyValue = Normalize-CliParameterValue -Name 'reverse_proxy' -Value $reverseProxyValue
@@ -845,31 +991,82 @@ $domainValue = if ($cliArgs['domain']) { [string]$cliArgs['domain'] } else { [st
 $domainValue = Normalize-CliParameterValue -Name 'domain' -Value $domainValue
 $publicPortValue = if ($cliArgs['public_port']) { [string]$cliArgs['public_port'] } else { [string]$PublicPort }
 $publicPortValue = Normalize-CliParameterValue -Name 'public_port' -Value $publicPortValue
+$volumeDirValue = if ($cliArgs['volume_dir']) { [string]$cliArgs['volume_dir'] } elseif (-not [string]::IsNullOrWhiteSpace($VolumeDir)) { [string]$VolumeDir } else { $null }
+$volumeDirValue = Normalize-CliParameterValue -Name 'volume_dir' -Value $volumeDirValue
+$volumeNameValue = if ($cliArgs['volume_name']) { [string]$cliArgs['volume_name'] } elseif (-not [string]::IsNullOrWhiteSpace($VolumeName)) { [string]$VolumeName } else { $null }
+$volumeNameValue = Normalize-CliParameterValue -Name 'volume_name' -Value $volumeNameValue
+$networkNameArg = if ($cliArgs['network_name']) { [string]$cliArgs['network_name'] } elseif (-not [string]::IsNullOrWhiteSpace($NetworkName)) { [string]$NetworkName } else { $null }
+$networkNameArg = Normalize-CliParameterValue -Name 'network_name' -Value $networkNameArg
+$modeValue = if ($cliArgs['mode']) { [string]$cliArgs['mode'] } elseif ($cliArgs['deploy_mode']) { [string]$cliArgs['deploy_mode'] } elseif (-not [string]::IsNullOrWhiteSpace($DeployMode)) { [string]$DeployMode } else { $null }
+$modeValue = Normalize-CliParameterValue -Name 'mode' -Value $modeValue
 $removeVolumes = Test-Truthy -Value $deleteVolumeValue
 $removeImages = Test-Truthy -Value $deleteImageValue
 $reverseProxyMode = Test-ReverseProxyMode -Value $reverseProxyValue
 
 $ProjectRoot = $PSScriptRoot
 $manifestDefaults = Get-DockerManifestDefaults -ProjectRoot $ProjectRoot
-$internalPortValue = if ($cliArgs['internal_port']) { [string]$cliArgs['internal_port'] } elseif (-not [string]::IsNullOrWhiteSpace($InternalPort)) { [string]$InternalPort } else { $manifestDefaults.ApiPort }
-$internalPortValue = Normalize-CliParameterValue -Name 'internal_port' -Value $internalPortValue
-
-Test-PortNumber -Value $internalPortValue -ParameterName '--internal-port'
-Test-PortNumber -Value $publicPortValue -ParameterName '--public-port'
+$containerName = $manifestDefaults.ContainerName
+if ([string]::IsNullOrWhiteSpace($volumeNameValue)) {
+    $volumeNameValue = "$containerName-volume"
+}
+if ([string]::IsNullOrWhiteSpace($volumeDirValue)) {
+    $volumeDirValue = Get-DefaultVolumeDir -ContainerName $containerName
+}
 
 $target = Resolve-SshTarget -SshString $sshStringValue
+if ($modeValue -eq 'server' -and $target.IsLocal) {
+    throw 'Server mode requires --ssh-string=<alias>.'
+}
 if (-not [string]::IsNullOrWhiteSpace($domainValue) -and $target.IsLocal) {
     throw '--domain requires --ssh-string for remote nginx configuration.'
 }
 
-$networkValue = $manifestDefaults.DockerNetwork
+$internalPortSpecified = $false
+if ($cliArgs['internal_port']) {
+    $internalPortValue = [string]$cliArgs['internal_port']
+    $internalPortSpecified = $true
+}
+elseif (-not [string]::IsNullOrWhiteSpace($InternalPort)) {
+    $internalPortValue = [string]$InternalPort
+    $internalPortSpecified = $true
+}
+else {
+    $internalPortValue = $null
+}
+$internalPortValue = Normalize-CliParameterValue -Name 'internal_port' -Value $internalPortValue
+
+$hostApiPort = $null
+$hostPostgresPort = $null
+if ($target.IsLocal) {
+    if (-not $internalPortSpecified -or [string]::IsNullOrWhiteSpace($internalPortValue)) {
+        $hostApiPort = $manifestDefaults.ApiPort
+        $internalPortValue = $hostApiPort
+    }
+    else {
+        $hostApiPort = $internalPortValue
+    }
+    $hostPostgresPort = Get-UnusedSafePort -ExcludePorts @([int]$hostApiPort)
+}
+else {
+    if (-not $internalPortSpecified -or [string]::IsNullOrWhiteSpace($internalPortValue)) {
+        $internalPortValue = $manifestDefaults.ApiPort
+    }
+    if ($reverseProxyMode -in @('none', 'direct', 'off')) {
+        $hostApiPort = $internalPortValue
+    }
+}
+
+Test-PortNumber -Value $internalPortValue -ParameterName '--internal-port'
+Test-PortNumber -Value $publicPortValue -ParameterName '--public-port'
+
+$networkValue = if (-not [string]::IsNullOrWhiteSpace($networkNameArg)) { $networkNameArg } else { $manifestDefaults.DockerNetwork }
 $apiHostValue = $manifestDefaults.ApiHost
 $apiPortValue = $manifestDefaults.ApiPort
 $apiContainerName = $manifestDefaults.ApiContainerName
-$containerName = $manifestDefaults.ContainerName
 $publishApiHostPort = $target.IsLocal -or ($reverseProxyMode -in @('none', 'direct', 'off'))
+$corsAllowedOrigins = Get-CorsAllowedOrigins -DomainName $domainValue
 
-$workDir = Resolve-RemoteWorkDir -ProjectRoot $ProjectRoot -Target $target -ContainerName $containerName
+$workDir = Resolve-RemoteWorkDir -ProjectRoot $ProjectRoot -Target $target -ContainerName $containerName -VolumeDir $(if ($target.IsLocal) { $null } else { $volumeDirValue })
 $imageTag = Get-StackImageTag -ProjectRoot $ProjectRoot
 $stackManifest = Get-StackManifest -ProjectRoot $ProjectRoot
 $stackName = if ($stackManifest -and $stackManifest.stackName) { [string]$stackManifest.stackName } else { 'dogan' }
@@ -877,7 +1074,7 @@ $stackName = if ($stackManifest -and $stackManifest.stackName) { [string]$stackM
 $targetLabel = if ($target.IsLocal) { 'localhost' } else { "ssh $($target.SshAlias)" }
 $volumeAction = if ($removeVolumes) { 'removing volumes' } else { 'keeping volumes' }
 $imageAction = if ($removeImages) { 'removing images' } else { 'keeping images' }
-$proxyLabel = if ($publishApiHostPort) { 'API host port' } else { 'sslh (docker network only)' }
+$proxyLabel = if ($publishApiHostPort) { "API host port $hostApiPort" } else { 'sslh (docker network only)' }
 $domainLabel = if ([string]::IsNullOrWhiteSpace($domainValue)) { 'none' } else { $domainValue }
 $totalSteps = if ($target.IsLocal) {
     3
@@ -888,20 +1085,26 @@ else {
 
 try {
     $deployMode = if ($target.IsLocal) { 'local Docker' } else { 'local build + image transfer' }
-    Write-Host ("Target: {0} ({1}) | network: {2} | api: {3}:{4} | domain: {5} | proxy: {6} | {7} | {8}" -f `
+    Write-Host ("Target: {0} ({1}) | network: {2} | api: {3}:{4} | host-port: {5} | volume-dir: {6} | volume-name: {7} | domain: {8} | proxy: {9} | {10} | {11}" -f `
         $targetLabel, $deployMode, $networkValue, $apiHostValue, $apiPortValue, `
+        $(if ($hostApiPort) { $hostApiPort } else { 'n/a' }), $volumeDirValue, $volumeNameValue, `
         $domainLabel, $proxyLabel, $volumeAction, $imageAction) -ForegroundColor Cyan
+
+    if ($target.IsLocal -and -not (Test-Path -LiteralPath $volumeDirValue)) {
+        New-Item -ItemType Directory -Path $volumeDirValue -Force | Out-Null
+        Write-Host "Created volume-dir: $volumeDirValue" -ForegroundColor DarkYellow
+    }
 
     Write-RunStep -Step 1 -Total $totalSteps -Message 'Checking Docker files'
     Test-DockerComposeFile -ProjectRoot $ProjectRoot
     Test-DockerCliAvailable -Target $target
 
-    Write-RunStep -Step 2 -Total $totalSteps -Message 'Building dogan-server image'
-    Build-LocalDockerImages -ProjectRoot $ProjectRoot
+    Write-RunStep -Step 2 -Total $totalSteps -Message 'Building dogan-api image'
+    Build-LocalDockerImages -ProjectRoot $ProjectRoot -ImageTag $imageTag
 
     if ($target.IsLocal) {
         Write-RunStep -Step 3 -Total $totalSteps -Message $(if ($removeVolumes) { 'Recreating stack (volumes removed)' } else { 'Recreating stack (keeping volumes)' })
-        Invoke-ComposeStack -Target $target -WorkingDirectory $workDir -RemoveVolumes:$removeVolumes -RemoveImages:$removeImages -Build:$false -NetworkName $networkValue -ApiImageTag $imageTag -ApiContainerName $apiContainerName -PublishApiHostPort:$publishApiHostPort
+        Invoke-ComposeStack -Target $target -WorkingDirectory $workDir -RemoveVolumes:$removeVolumes -RemoveImages:$removeImages -Build:$false -NetworkName $networkValue -ApiImageTag $imageTag -ApiContainerName $apiContainerName -PublishApiHostPort:$publishApiHostPort -HostApiPort $hostApiPort -HostPostgresPort $hostPostgresPort -CorsAllowedOrigins $corsAllowedOrigins
     }
     else {
         Write-RunStep -Step 3 -Total $totalSteps -Message "Syncing compose files to $targetLabel"
@@ -915,7 +1118,7 @@ try {
 
         $stackStep = if ([string]::IsNullOrWhiteSpace($domainValue)) { 6 } else { 6 }
         Write-RunStep -Step $stackStep -Total $totalSteps -Message $(if ($removeVolumes) { 'Recreating stack (volumes removed)' } else { 'Recreating stack (keeping volumes)' })
-        Invoke-ComposeStack -Target $target -WorkingDirectory $workDir -RemoveVolumes:$removeVolumes -RemoveImages:$removeImages -Build:$false -NetworkName $networkValue -ApiImageTag $imageTag -ApiContainerName $apiContainerName -PublishApiHostPort:$publishApiHostPort
+        Invoke-ComposeStack -Target $target -WorkingDirectory $workDir -RemoveVolumes:$removeVolumes -RemoveImages:$removeImages -Build:$false -NetworkName $networkValue -ApiImageTag $imageTag -ApiContainerName $apiContainerName -PublishApiHostPort:$publishApiHostPort -HostApiPort $hostApiPort -HostPostgresPort $hostPostgresPort -CorsAllowedOrigins $corsAllowedOrigins
 
         if (-not [string]::IsNullOrWhiteSpace($domainValue)) {
             Write-RunStep -Step 7 -Total $totalSteps -Message "Mapping domain '$domainValue' to $apiContainerName"
@@ -923,25 +1126,28 @@ try {
         }
     }
 
-    Write-Progress -Activity 'dogan-server Docker run' -Completed -Status 'Done'
+    Write-Progress -Activity 'dogan-api Docker run' -Completed -Status 'Done'
     Write-Host ''
 
     if ($target.IsLocal) {
         Write-Host 'Stack is running on localhost.' -ForegroundColor Green
-        Write-Host '  API:      http://localhost:8080/dogan/api/v1/health' -ForegroundColor Green
-        Write-Host '  Postgres: localhost:5432' -ForegroundColor Green
+        Write-Host ("  API:      http://localhost:{0}/dogan/api/v1/health" -f $hostApiPort) -ForegroundColor Green
+        Write-Host ("  Postgres: localhost:{0}" -f $hostPostgresPort) -ForegroundColor Green
         Write-Host '  LiveKit:  ws://localhost:7880' -ForegroundColor Green
+        Write-Host ("  Network:  {0}" -f $networkValue) -ForegroundColor Green
+        Write-Host ("  Volume:   {0} ({1})" -f $volumeNameValue, $volumeDirValue) -ForegroundColor Green
     }
     else {
         Write-Host "Stack is running on remote host at $workDir (network: $networkValue, api: ${apiHostValue}:${apiPortValue})." -ForegroundColor Green
         Write-Host ("Images were built locally and deployed to {0} without a remote build." -f $target.SshAlias) -ForegroundColor Green
+        Write-Host ("  Volume:   {0} ({1})" -f $volumeNameValue, $volumeDirValue) -ForegroundColor Green
         if (-not [string]::IsNullOrWhiteSpace($domainValue)) {
             Write-Host "  URL:  https://${domainValue}/" -ForegroundColor Green
         }
     }
 }
 catch {
-    Write-Progress -Activity 'dogan-server Docker run' -Completed -Status 'Failed'
+    Write-Progress -Activity 'dogan-api Docker run' -Completed -Status 'Failed'
     Write-Host ''
     Write-Host $_.Exception.Message -ForegroundColor Red
     Write-Host ''

@@ -6,11 +6,17 @@ Dogan is a Go REST API for a personal Android + web monitoring stack. It stores 
 
 **Run:**
 ```powershell
-.\build-docker-image.ps1
-docker compose up -d
+.\create-image.ps1
+.\run-on-docker-local.ps1
 .\scripts\test-dummy-data.ps1
+```
+
+Remote:
+```powershell
+.\run-on-docker-server.ps1 --ssh-string=<alias>
 ```
 
 **Entry point:** `cmd/server/main.go`  
 **API base:** `/dogan/api/v1`  
-**Login:** user `armin` — see `armin-credentials.txt` (local, gitignored)
+**CORS:** `DOGAN_CORS_ALLOWED_ORIGINS` defaults to local web (`:30808`) plus `https://dogan.xaigrok.ir`. Remote `--domain` appends `https://<domain>`.  
+**Login:** user `armin` — plaintext in local `armin-credentials.txt` (gitignored; regenerate + update `internal/auth/credentials.go` hash if missing)

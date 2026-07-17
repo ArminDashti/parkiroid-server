@@ -2,6 +2,7 @@ package router
 
 import (
 	"log"
+	"time"
 
 	"github.com/dogan/dogan-server/internal/auth"
 	"github.com/dogan/dogan-server/internal/config"
@@ -9,12 +10,20 @@ import (
 	livekitauth "github.com/dogan/dogan-server/internal/livekit"
 	"github.com/dogan/dogan-server/internal/middleware"
 	"github.com/dogan/dogan-server/internal/store"
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 )
 
 func New(applicationConfig config.Config) *gin.Engine {
 	engine := gin.New()
 	engine.Use(gin.Logger(), gin.Recovery())
+	engine.Use(cors.New(cors.Config{
+		AllowOrigins: applicationConfig.CORSAllowedOrigins,
+		AllowMethods: []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
+		AllowHeaders: []string{"Origin", "Content-Type", "Authorization", "Accept"},
+		ExposeHeaders: []string{"Content-Length"},
+		MaxAge:       12 * time.Hour,
+	}))
 
 	postgresStore, err := store.OpenPostgres(applicationConfig.DatabaseURL, applicationConfig.RetentionPeriod)
 	if err != nil {

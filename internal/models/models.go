@@ -72,6 +72,8 @@ type DeviceMetricsRecord struct {
 	ServerLatencyMs    *int      `json:"server_latency_ms,omitempty"`
 	DeviceIPAddress    string    `json:"device_ip_address,omitempty"`
 	Jolt               *float64  `json:"jolt,omitempty"`
+	CPUUsagePercent    *float64  `json:"cpu_usage_percent,omitempty"`
+	RAMUsagePercent    *float64  `json:"ram_usage_percent,omitempty"`
 	RecordedAt         time.Time `json:"recorded_at"`
 	ReceivedAt         time.Time `json:"received_at"`
 }
@@ -98,6 +100,8 @@ type TelemetryPayload struct {
 	AmbientLightLux          float64      `json:"ambient_light_lux"`
 	ServerLatencyMs          int          `json:"server_latency_ms"`
 	DeviceIPAddress          string       `json:"device_ip_address"`
+	CPUUsagePercent          *float64     `json:"cpu_usage_percent,omitempty"`
+	RAMUsagePercent          *float64     `json:"ram_usage_percent,omitempty"`
 }
 
 // DeviceTelemetrySnapshot is the web live dashboard shape (GET /devices/:id/telemetry).

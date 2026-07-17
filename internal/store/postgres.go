@@ -143,8 +143,9 @@ func (store *PostgresStore) SaveMetrics(metrics models.DeviceMetricsRecord) erro
 			temperature_c, latitude, longitude,
 			cabin_noise_rms, gps_signal_quality, speed_kmh, ambient_light_lux,
 			server_latency_ms, device_ip_address, jolt,
+			cpu_usage_percent, ram_usage_percent,
 			recorded_at, received_at
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)`,
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)`,
 		deviceRowID,
 		nullableFloat(metrics.BatteryLevel),
 		nullableInt(metrics.SignalStrength),
@@ -159,6 +160,8 @@ func (store *PostgresStore) SaveMetrics(metrics models.DeviceMetricsRecord) erro
 		nullableInt(metrics.ServerLatencyMs),
 		nullIfEmpty(metrics.DeviceIPAddress),
 		nullableFloat(metrics.Jolt),
+		nullableFloat(metrics.CPUUsagePercent),
+		nullableFloat(metrics.RAMUsagePercent),
 		recordedAt,
 		receivedAt,
 	)
@@ -192,6 +195,8 @@ func (store *PostgresStore) GetLatestMetrics(deviceID string) (models.DeviceMetr
 	var serverLatencyMs sql.NullInt64
 	var deviceIPAddress sql.NullString
 	var jolt sql.NullFloat64
+	var cpuUsagePercent sql.NullFloat64
+	var ramUsagePercent sql.NullFloat64
 	cutoff := store.retentionCutoff()
 
 	err = store.db.QueryRow(
@@ -199,6 +204,7 @@ func (store *PostgresStore) GetLatestMetrics(deviceID string) (models.DeviceMetr
 		        temperature_c, latitude, longitude,
 		        cabin_noise_rms, gps_signal_quality, speed_kmh, ambient_light_lux,
 		        server_latency_ms, device_ip_address, jolt,
+		        cpu_usage_percent, ram_usage_percent,
 		        recorded_at, received_at
 		 FROM android_telemetry
 		 WHERE device_id = $1 AND recorded_at >= $2
@@ -220,6 +226,8 @@ func (store *PostgresStore) GetLatestMetrics(deviceID string) (models.DeviceMetr
 		&serverLatencyMs,
 		&deviceIPAddress,
 		&jolt,
+		&cpuUsagePercent,
+		&ramUsagePercent,
 		&metrics.RecordedAt,
 		&metrics.ReceivedAt,
 	)
@@ -244,6 +252,8 @@ func (store *PostgresStore) GetLatestMetrics(deviceID string) (models.DeviceMetr
 	metrics.ServerLatencyMs = intPointer(serverLatencyMs)
 	metrics.DeviceIPAddress = stringValue(deviceIPAddress)
 	metrics.Jolt = floatPointer(jolt)
+	metrics.CPUUsagePercent = floatPointer(cpuUsagePercent)
+	metrics.RAMUsagePercent = floatPointer(ramUsagePercent)
 
 	return metrics, nil
 }
@@ -270,6 +280,7 @@ func (store *PostgresStore) ListMetricsHistory(deviceID string, limit int) ([]mo
 		        temperature_c, latitude, longitude,
 		        cabin_noise_rms, gps_signal_quality, speed_kmh, ambient_light_lux,
 		        server_latency_ms, device_ip_address, jolt,
+		        cpu_usage_percent, ram_usage_percent,
 		        recorded_at, received_at
 		 FROM android_telemetry
 		 WHERE device_id = $1 AND recorded_at >= $2
@@ -300,6 +311,8 @@ func (store *PostgresStore) ListMetricsHistory(deviceID string, limit int) ([]mo
 		var serverLatencyMs sql.NullInt64
 		var deviceIPAddress sql.NullString
 		var jolt sql.NullFloat64
+		var cpuUsagePercent sql.NullFloat64
+		var ramUsagePercent sql.NullFloat64
 
 		if err := rows.Scan(
 			&batteryLevel,
@@ -315,6 +328,8 @@ func (store *PostgresStore) ListMetricsHistory(deviceID string, limit int) ([]mo
 			&serverLatencyMs,
 			&deviceIPAddress,
 			&jolt,
+			&cpuUsagePercent,
+			&ramUsagePercent,
 			&metrics.RecordedAt,
 			&metrics.ReceivedAt,
 		); err != nil {
@@ -335,6 +350,8 @@ func (store *PostgresStore) ListMetricsHistory(deviceID string, limit int) ([]mo
 		metrics.ServerLatencyMs = intPointer(serverLatencyMs)
 		metrics.DeviceIPAddress = stringValue(deviceIPAddress)
 		metrics.Jolt = floatPointer(jolt)
+		metrics.CPUUsagePercent = floatPointer(cpuUsagePercent)
+		metrics.RAMUsagePercent = floatPointer(ramUsagePercent)
 		history = append(history, metrics)
 	}
 
