@@ -3,7 +3,7 @@
   Deploy stack to a remote host over SSH using sibling YAML only.
 
 .DESCRIPTION
-  Sample for .armin/docker-scripts/run-on-docker-server.ps1.
+  Deploy script for .armin/docker-scripts/run-on-docker-server.ps1.
   Reads run-on-docker-server.yaml — no CLI -- flags.
   Flow when build_image_on is local: build locally → docker save → SCP → remote docker load → sync files → remote compose up -d.
   Flow when build_image_on is server: sync repo to remote → remote docker build → remote compose up -d.
@@ -43,7 +43,7 @@ CONFIG:
   dockerfile          Dockerfile path relative to .armin/docker-scripts
   docker_network      External Docker network on remote
   publish_port        Optional host bind port; omit or empty = no host bind
-  internal_port       Container listen port; overrides compose when set
+  internal_port       Container listen port; unused by this repo's compose
   delete_volume       yes/true/1/y/on → remove volumes before up
   delete_image        yes/true/1/y/on → remove image during teardown
   build_image_on      local = build here and upload; server = build on remote
@@ -52,7 +52,7 @@ CONFIG:
 
 NOTES:
   - No CLI -- flags. Change behavior only via YAML.
-  - Non-empty override fields replace compose / Dockerfile values via env vars.
+  - Sets API_IMAGE_TAG / DOGAN_PUBLISH_PORT / DOCKER_NETWORK for this repo's compose.
   - Alias mode uses ~/.ssh/config (no ssh_key field).
   - Rejects placeholder ssh values at runtime.
   - Never prints the password segment of host@user@password.
@@ -115,11 +115,12 @@ function Get-RepoRelativePath([string]$AbsolutePath) {
 
 function Build-ComposeEnvPrefix([hashtable]$Cfg, [string]$PublishPort) {
     $pairs = New-Object System.Collections.Generic.List[string]
+    # Always set so empty publish_port clears compose default (${DOGAN_PUBLISH_PORT-8080}).
     $escapedPublish = $PublishPort.Replace("'", "'\\''")
-    [void]$pairs.Add("PUBLISH_PORT='$escapedPublish'")
+    [void]$pairs.Add("DOGAN_PUBLISH_PORT='$escapedPublish'")
 
     $mapping = @{
-        image_tag       = 'IMAGE_TAG'
+        image_tag       = 'API_IMAGE_TAG'
         docker_network  = 'DOCKER_NETWORK'
         internal_port   = 'INTERNAL_PORT'
     }
@@ -283,10 +284,43 @@ try {
     Write-Step "Ensuring remote volume dir $volumeDir"
     Invoke-Remote -Target $target -RemoteCommand "mkdir -p '$volumeDir'"
 
+    # Sync deploy files before teardown so compose down can find the compose file.
     if ($buildImageOn -eq 'server') {
         Write-Step "Syncing repo to $volumeDir for remote build"
         Copy-DirToRemote -Target $target -LocalDir $RepoRoot -RemoteDir $volumeDir
         Write-Ok 'Repo synced to remote'
+    }
+    else {
+        $livekitPath = Join-Path $RepoRoot 'livekit.yaml'
+        $syncPairs = @(
+            @{ Local = $composePath; Remote = $remoteCompose; Label = $composeFileName }
+            @{ Local = Join-Path $DeployDir 'run-on-docker-server.yaml'; Remote = "$volumeDir/run-on-docker-server.yaml"; Label = 'run-on-docker-server.yaml' }
+            @{ Local = $livekitPath; Remote = "$volumeDir/livekit.yaml"; Label = 'livekit.yaml' }
+        )
+        foreach ($pair in $syncPairs) {
+            if (-not (Test-Path -LiteralPath $pair.Local)) { throw "Sync source not found: $($pair.Local)" }
+            Write-Step "Sync $($pair.Label)"
+            Copy-ToRemote -Target $target -LocalPath $pair.Local -RemotePath $pair.Remote
+        }
+    }
+
+    $downFlags = if ($deleteVolume) { '-v' } else { '' }
+
+    # Teardown before image load/build so delete_image does not remove the new image.
+    if ($deleteVolume -or $deleteImage) {
+        Write-Step 'Remote compose down'
+        Invoke-Remote -Target $target -RemoteCommand "docker compose -p '$stackName' -f '$remoteCompose' --project-directory '$volumeDir' down $downFlags"
+    }
+
+    if ($deleteImage) {
+        Write-Step "Removing remote image $imageTag"
+        Invoke-Remote -Target $target -RemoteCommand "docker image rm -f '$imageTag' || true"
+    }
+
+    if ($buildImageOn -eq 'server') {
+        Write-Step "Building $imageTag on remote (dockerfile=$remoteDockerfile context=$volumeDir)"
+        Invoke-Remote -Target $target -RemoteCommand "docker build -f '$volumeDir/$remoteDockerfile' -t '$imageTag' '$volumeDir'"
+        Write-Ok "Built $imageTag on remote"
     }
     else {
         Write-Step "Building $imageTag locally (dockerfile=$dockerfile context=$RepoRoot)"
@@ -306,36 +340,6 @@ try {
         Invoke-Remote -Target $target -RemoteCommand "docker load -i $remoteTar && rm -f $remoteTar"
         Write-Ok 'Image loaded on remote'
         Remove-Item -LiteralPath $tarPath -Force -ErrorAction SilentlyContinue
-
-        $syncItems = @(
-            $composeFileName
-            'run-on-docker-server.yaml'
-        )
-        foreach ($item in $syncItems) {
-            $localItem = if ($item -eq $composeFileName) { $composePath } else { Join-Path $DeployDir $item }
-            if (-not (Test-Path -LiteralPath $localItem)) { throw "Sync source not found: $localItem" }
-            $remoteItem = "$volumeDir/$item"
-            Write-Step "Sync $item"
-            Copy-ToRemote -Target $target -LocalPath $localItem -RemotePath $remoteItem
-        }
-    }
-
-    $downFlags = if ($deleteVolume) { '-v' } else { '' }
-
-    if ($deleteVolume -or $deleteImage) {
-        Write-Step 'Remote compose down'
-        Invoke-Remote -Target $target -RemoteCommand "docker compose -p '$stackName' -f '$remoteCompose' --project-directory '$volumeDir' down $downFlags"
-    }
-
-    if ($deleteImage) {
-        Write-Step "Removing remote image $imageTag"
-        Invoke-Remote -Target $target -RemoteCommand "docker image rm -f '$imageTag' || true"
-    }
-
-    if ($buildImageOn -eq 'server') {
-        Write-Step "Building $imageTag on remote (dockerfile=$remoteDockerfile context=$volumeDir)"
-        Invoke-Remote -Target $target -RemoteCommand "docker build -f '$volumeDir/$remoteDockerfile' -t '$imageTag' '$volumeDir'"
-        Write-Ok "Built $imageTag on remote"
     }
 
     Write-Step "Ensuring remote network $network"

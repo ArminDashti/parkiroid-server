@@ -1,0 +1,32 @@
+# Deploy dogan stack to Irancell-T3
+
+- **Timestamp:** 2026-07-24 20:34 +03:30
+- **Host:** t3-new (`ssh t3` → cloud-admin@2.144.27.74)
+- **Deploy root:** `/home/cloud-admin/docker/dogan`
+
+## Commands
+
+1. Filled `.armin/docker-scripts/run-on-docker-server.yaml` (`ssh t3`, volume_dir, `delete_image: yes`, `build_image_on: local`)
+2. Renamed compose LiveKit service/container to `livekit` (HAProxy backend name)
+3. Fixed server deploy script: teardown/delete image before load; sync `livekit.yaml`
+4. Ran `.\.armin\docker-scripts\run-on-docker-server.ps1`
+5. Verified via `ssh t3`: containers up; HAProxy → `dogan-api:8080` health OK
+
+## Important outputs
+
+- Local build + SCP image upload succeeded (`dogan-api:latest`)
+- Remote `build_image_on: server` failed earlier: `proxy.golang.org` 403
+- Containers: `dogan-api` (healthy), `dogan-pgsql` (healthy), `livekit` (up) on `t3-net`
+- Internal: `wget http://dogan-api:8080/dogan/api/v1/health` → `{"status":"ok",...}`
+- `dogan-webui` still Exited → `https://dogan.xaigrok.ir/` returns 503
+- Client DNS: `dogan-api.xaigrok.ir` not resolving from some networks
+
+## Result
+
+API + Postgres + LiveKit installed and running on Irancell-T3 behind HAProxy.
+
+## Warnings
+
+- SSH MCP `irancell` points at old IP `2.144.13.55` (timeout); use shell `ssh t3` / skill fallback
+- Prefer `build_image_on: local` on this host (GOPROXY blocked)
+- Web UI container not part of this deploy; start `dogan-webui` separately for `dogan.xaigrok.ir`

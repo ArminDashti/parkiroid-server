@@ -4,17 +4,22 @@ Dogan is a Go REST API for a personal Android + web monitoring stack. It stores 
 
 **Stack:** Go 1.26, Gin, PostgreSQL 16, LiveKit, Docker Compose.
 
-**Run:**
+**Run (preferred):**
 ```powershell
-.\create-image.ps1
-.\run-on-docker-local.ps1
+.\.armin\docker-scripts\run-on-docker-local.ps1
 .\scripts\test-dummy-data.ps1
 ```
 
-Remote:
+Local API URL after deploy: `http://localhost:30251/dogan/api/v1/health` (`publish_port` in `run-on-docker-local.yaml`; avoids host `8080` clashes).
+
+Remote (Irancell-T3 — YAML already set for `ssh t3`):
 ```powershell
-.\run-on-docker-server.ps1 --ssh-string=<alias>
+.\.armin\docker-scripts\run-on-docker-server.ps1
 ```
+
+Production HAProxy hosts on t3: `https://dogan-api.xaigrok.ir`, `wss://dogan-livekit.xaigrok.ir`, web `https://dogan.xaigrok.ir` (separate `dogan-webui` container).
+
+Legacy root wrappers (`.\run-on-docker-local.ps1`, `.\create-image.ps1`) still exist; prefer `.armin/docker-scripts/`.
 
 **Entry point:** `cmd/server/main.go`  
 **API base:** `/dogan/api/v1`  

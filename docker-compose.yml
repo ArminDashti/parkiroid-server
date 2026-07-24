@@ -21,9 +21,9 @@ services:
     expose:
       - "5432"
 
-  dogan-livekit:
+  livekit:
     image: livekit/livekit-server:latest
-    container_name: dogan-livekit
+    container_name: livekit
     command: --config /etc/livekit.yaml
     volumes:
       - ./livekit.yaml:/etc/livekit.yaml:ro
@@ -45,7 +45,7 @@ services:
     depends_on:
       dogan-pgsql:
         condition: service_healthy
-      dogan-livekit:
+      livekit:
         condition: service_started
     expose:
       - "8080"
@@ -62,7 +62,7 @@ services:
       DOGAN_DATABASE_URL: postgres://dogan:dogan@dogan-pgsql:5432/dogan?sslmode=disable
       DOGAN_FRAMES_DIR: /data/frames
       DOGAN_MODELS_DIR: /data/models
-      DOGAN_LIVEKIT_URL: ${DOGAN_LIVEKIT_URL:-ws://dogan-livekit:7880}
+      DOGAN_LIVEKIT_URL: ${DOGAN_LIVEKIT_URL:-ws://livekit:7880}
       DOGAN_LIVEKIT_PUBLIC_URL: ${DOGAN_LIVEKIT_PUBLIC_URL:-wss://dogan-livekit.xaigrok.ir}
       DOGAN_LIVEKIT_API_KEY: ${DOGAN_LIVEKIT_API_KEY:-devkey}
       DOGAN_LIVEKIT_API_SECRET: ${DOGAN_LIVEKIT_API_SECRET:-secret}

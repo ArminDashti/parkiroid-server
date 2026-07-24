@@ -1,0 +1,25 @@
+# Fix web UI calling localhost:8080 (CORS OPTIONS 403)
+
+- **Timestamp:** 2026-07-24 21:22 +03:30
+- **Host:** t3-new
+- **Symptom:** Browser on https://dogan.xaigrok.ir/ called `http://localhost:8080/dogan/api/v1/auth/login` (OPTIONS 403)
+
+## Cause
+
+`parkiroid-web:latest` was built with default `VITE_API_BASE_URL=http://localhost:8080/dogan/api/v1`. Production API CORS is fine (`https://dogan.xaigrok.ir` allowed; OPTIONS → 204).
+
+## Fix applied
+
+Patched live asset in `dogan-webui`:
+
+`http://localhost:8080/dogan/api/v1` → `https://dogan-api.xaigrok.ir/dogan/api/v1`
+
+in `/usr/share/nginx/html/assets/index-ejEv6ibH.js`, then `nginx -s reload`.
+
+## Follow-up
+
+Rebuild `parkiroid-web` with:
+
+`VITE_API_BASE_URL=https://dogan-api.xaigrok.ir/dogan/api/v1`
+
+or the patch is lost on image recreate.

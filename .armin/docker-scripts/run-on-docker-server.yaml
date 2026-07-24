@@ -1,0 +1,21 @@
+# Remote deploy settings — scripts read this file only (no CLI -- flags).
+# Non-empty override fields replace values from compose_file / dockerfile.
+# HAProxy (t3): dogan-api.xaigrok.ir → dogan-api:8080,
+#   dogan-livekit.xaigrok.ir → livekit:7880, dogan.xaigrok.ir → dogan-webui:80 (web).
+
+stack_name: dogan
+image_tag: dogan-api:latest
+compose_file: ../../docker-compose.yml
+dockerfile: ../../Dockerfile
+docker_network: t3-net
+internal_port: ""
+publish_port: ""
+delete_volume: "no"
+delete_image: "yes"
+# local = build here and upload; server = build on remote
+# Use local: remote GOPROXY is blocked (403) on this host.
+build_image_on: "local"
+
+ssh: "ssh t3"
+
+volume_dir: "/home/cloud-admin/docker/dogan"

@@ -2,11 +2,17 @@
 
 ```
 .
-├── create-image.ps1             # Build dogan-server Docker image
+├── .armin/
+│   └── docker-scripts/          # YAML-only local/server Docker deploy
+│       ├── run-on-docker-local.ps1
+│       ├── run-on-docker-local.yaml
+│       ├── run-on-docker-server.ps1
+│       └── run-on-docker-server.yaml
+├── create-image.ps1             # Legacy image build helper
 ├── build-docker-image.ps1       # Compat wrapper → create-image.ps1
-├── run-on-docker-local.ps1      # Local Docker Compose deploy
-├── run-on-docker-server.ps1     # Remote Docker deploy over SSH
-├── run-on-docker.ps1            # Deploy engine used by local/server scripts
+├── run-on-docker-local.ps1      # Legacy CLI local deploy wrapper
+├── run-on-docker-server.ps1     # Legacy CLI remote deploy wrapper
+├── run-on-docker.ps1            # Legacy deploy engine
 ├── cmd/
 │   ├── issue-token/main.go      # Generate embedded API token (dg_*)
 │   └── server/main.go           # HTTP server entry point

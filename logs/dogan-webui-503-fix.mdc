@@ -1,0 +1,32 @@
+# Fix dogan.xaigrok.ir 503 (dogan-webui down)
+
+- **Timestamp:** 2026-07-24 21:15 +03:30
+- **Host:** t3-new (`ssh t3` → cloud-admin@2.144.27.74)
+- **URL:** https://dogan.xaigrok.ir/
+
+## Cause
+
+HAProxy routes `dogan.xaigrok.ir` → `dogan-webui:80`. Container was `Exited (255)` because:
+
+`failed to set up container networking: could not find a network matching network mode parkiroid-net: network parkiroid-net not found`
+
+API stack (`dogan-api`, `dogan-pgsql`, `livekit`) was healthy on `t3-net`; only the web UI was down.
+
+## Commands
+
+1. Inspected `dogan-webui` state, logs, and networks
+2. Temporarily created `parkiroid-net` and started the old container; verified HAProxy → webui
+3. Recreated container permanently on `t3-net`:
+   - `docker stop` / rename old → `dogan-webui-broken-parkiroid-net`
+   - `docker run -d --name dogan-webui --restart unless-stopped --network t3-net -v /cloud-admin/docker-volumes/parkiroid-web:/data:rw parkiroid-web:latest`
+   - Removed old container and unused `parkiroid-net`
+4. Verified `https://dogan.xaigrok.ir/` → HTTP 200
+
+## Result
+
+`dogan-webui` is Up on `t3-net`; public site returns 200.
+
+## Warnings
+
+- Web UI image is still `parkiroid-web:latest` (legacy name); not part of the `dogan` Compose deploy in this repo
+- Prefer keeping webui on `t3-net` only so HAProxy DNS resolution keeps working after reboots
