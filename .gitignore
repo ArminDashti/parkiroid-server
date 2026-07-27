@@ -1,5 +1,14 @@
+*.exe
+*.EXE
+
 frames/
 *.db
 *.db-*
 armin-credentials.txt
 .deploy/
+
+# --- auto: github-commit-push-all-repos ---
+bin/dogan-server.exe
+bin/dogan-server.exe bin/parkiroid-server.exe
+bin/parkiroid-server.exe
+# --- end auto ---
