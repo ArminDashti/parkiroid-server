@@ -258,6 +258,7 @@ function Resolve-SshTarget {
         return [pscustomobject]@{
             IsLocal  = $true
             SshAlias = $null
+            Port     = $null
         }
     }
 
@@ -274,6 +275,7 @@ function Resolve-SshTarget {
     return [pscustomobject]@{
         IsLocal  = $false
         SshAlias = $alias
+        Port     = '80'
     }
 }
 
@@ -296,7 +298,10 @@ function Invoke-RemoteCommand {
     }
 
     $escapedCommand = $remoteCommand -replace "'", "'\''"
-    $output = & ssh $Target.SshAlias "bash -lc '$escapedCommand'" 2>&1 | Out-String
+    $sshArgs = @()
+    if ($Target.Port) { $sshArgs += @('-p', [string]$Target.Port) }
+    $sshArgs += @($Target.SshAlias, "bash -lc '$escapedCommand'")
+    $output = & ssh @sshArgs 2>&1 | Out-String
     if ($LASTEXITCODE -ne 0) { throw "Remote command failed (exit $LASTEXITCODE): $remoteCommand" }
     return $output.Trim()
 }
@@ -324,7 +329,10 @@ function Invoke-RemoteShell {
     }
 
     $escapedCommand = $remoteCommand -replace "'", "'\''"
-    & ssh $Target.SshAlias "bash -lc '$escapedCommand'"
+    $sshArgs = @()
+    if ($Target.Port) { $sshArgs += @('-p', [string]$Target.Port) }
+    $sshArgs += @($Target.SshAlias, "bash -lc '$escapedCommand'")
+    & ssh @sshArgs
     if ($LASTEXITCODE -ne 0) { throw "Remote command failed (exit $LASTEXITCODE): $remoteCommand" }
 }
 
@@ -347,7 +355,10 @@ function Copy-FileToRemote {
         [string]$RemotePath
     )
 
-    & scp -o StrictHostKeyChecking=accept-new $LocalPath "$($Target.SshAlias):$RemotePath"
+    $scpArgs = @('-o', 'StrictHostKeyChecking=accept-new')
+    if ($Target.Port) { $scpArgs += @('-P', [string]$Target.Port) }
+    $scpArgs += @($LocalPath, "$($Target.SshAlias):$RemotePath")
+    & scp @scpArgs
     if ($LASTEXITCODE -ne 0) { throw "Failed to copy '$LocalPath' to remote." }
 }
 
@@ -1071,7 +1082,13 @@ $imageTag = Get-StackImageTag -ProjectRoot $ProjectRoot
 $stackManifest = Get-StackManifest -ProjectRoot $ProjectRoot
 $stackName = if ($stackManifest -and $stackManifest.stackName) { [string]$stackManifest.stackName } else { 'dogan' }
 
-$targetLabel = if ($target.IsLocal) { 'localhost' } else { "ssh $($target.SshAlias)" }
+$targetLabel = if ($target.IsLocal) {
+    'localhost'
+} elseif ($target.Port) {
+    "ssh $($target.SshAlias) -p $($target.Port)"
+} else {
+    "ssh $($target.SshAlias)"
+}
 $volumeAction = if ($removeVolumes) { 'removing volumes' } else { 'keeping volumes' }
 $imageAction = if ($removeImages) { 'removing images' } else { 'keeping images' }
 $proxyLabel = if ($publishApiHostPort) { "API host port $hostApiPort" } else { 'sslh (docker network only)' }

@@ -16,6 +16,6 @@ delete_image: "yes"
 # Use local: remote GOPROXY is blocked (403) on this host.
 build_image_on: "local"
 
-ssh: "ssh t3"
+ssh: "ssh t3 -p 80"
 
 volume_dir: "/home/cloud-admin/docker/dogan"

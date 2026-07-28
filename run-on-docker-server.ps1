@@ -17,7 +17,7 @@ USAGE:
   .\run-on-docker-server.ps1 --ssh-string=<alias> [flags]
 
 FLAGS:
-  --ssh-string=<alias>       SSH config alias (required; default: null -> error)
+  --ssh-string=<alias>       SSH config alias (default: t3; connects with -p 80)
   --delete-image=<no|yes>    Remove built images during teardown (default: null -> no)
   --delete-volume=<no|yes>   Remove volumes before recreate (default: null -> no)
   --internal-port=<port>     Container port for domain routing / host publish (default: null -> 8080 from manifest)
@@ -30,13 +30,13 @@ FLAGS:
   --help                     Show this help
 
 EXAMPLES:
-  .\run-on-docker-server.ps1 --ssh-string=myserver
-  .\run-on-docker-server.ps1 --ssh-string=myserver --delete-volume=yes
-  .\run-on-docker-server.ps1 --ssh-string=myserver --domain=dogan.xaigrok.ir --internal-port=8080
-  .\run-on-docker-server.ps1 --ssh-string=myserver --reverse-proxy=none --internal-port=30042
+  .\run-on-docker-server.ps1
+  .\run-on-docker-server.ps1 --ssh-string=t3 --delete-volume=yes
+  .\run-on-docker-server.ps1 --domain=dogan.xaigrok.ir --internal-port=8080
+  .\run-on-docker-server.ps1 --reverse-proxy=none --internal-port=30042
 
 NOTES:
-  --ssh-string is required. Use SSH config alias only; do not include "ssh".
+  Default SSH target is t3 on port 80 (ssh t3 -p 80). Pass alias only; do not include "ssh".
   - Null defaults resolve as described in FLAGS.
   - Truthy values for yes/no flags: yes, true, 1, y, on.
   - Image is built locally, saved, SCP'd, and loaded on the remote host (no remote build).
@@ -107,11 +107,11 @@ try {
     }
 
     if ([string]::IsNullOrWhiteSpace($flags['ssh_string'])) {
-        throw 'Missing required --ssh-string=<alias>. Example: --ssh-string=myserver'
+        $flags['ssh_string'] = 't3'
     }
 
     if ($flags['ssh_string'] -match '^(?i)ssh(\s|$)') {
-        throw 'Invalid --ssh-string. Pass only the SSH config alias (e.g. myserver). Do not include "ssh".'
+        throw 'Invalid --ssh-string. Pass only the SSH config alias (e.g. t3). Do not include "ssh".'
     }
 
     $forward = [System.Collections.Generic.List[string]]::new()
