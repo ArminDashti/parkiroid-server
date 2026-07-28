@@ -1,0 +1,44 @@
+# Open LiveKit ports on t3
+
+- **Timestamp:** 2026-07-28
+- **Host:** t3-new (`2.144.27.74`) via `ssh t3`
+
+## Goal
+
+Ensure UFW allows all LiveKit ports needed by `livekit.yaml` / `docker-compose.yml`.
+
+## Required ports (from config)
+
+| Port | Proto | Role |
+|------|-------|------|
+| 443 | TCP | HAProxy → LiveKit signaling (`dogan-livekit.xaigrok.ir` → `:7880`) |
+| 7881 | TCP | LiveKit RTC over TCP |
+| 50000–51000 | UDP | LiveKit RTC media |
+
+`7880` is intentionally not published on the host; clients use `wss://` on 443.
+
+## Commands executed
+
+```bash
+hostname && sudo ufw status verbose
+sudo ss -tulnp | grep -E '7880|7881|50000|51000'
+sudo docker ps -a --filter name=livekit
+```
+
+## Important outputs
+
+UFW already had:
+
+- `7881/tcp` ALLOW — LiveKit RTC TCP
+- `50000:51000/udp` ALLOW — LiveKit RTC UDP
+- `443/tcp` ALLOW — HAProxy (signaling)
+
+`livekit` container status at inspect time: **Created** (not running). Many `docker-proxy` UDP sockets for the media range were present.
+
+Later reconnect attempts (`ping` / `ssh t3`) timed out — host unreachable from this network at end of task.
+
+## Result
+
+- Firewall: **already open** for necessary LiveKit ports; no new UFW rules required.
+- Warning: could not re-apply/verify after mid-task SSH timeout; last successful read showed rules present.
+- Warning: LiveKit container not in running state — separate from firewall.

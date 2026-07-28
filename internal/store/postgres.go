@@ -946,7 +946,10 @@ func (store *PostgresStore) ListDevices() ([]models.DeviceListItem, error) {
 	rows, err := store.db.Query(
 		`SELECT d.mac_address, d.device_name,
 		        CASE
-		            WHEN t.recorded_at IS NOT NULL AND t.recorded_at >= NOW() AT TIME ZONE 'UTC' - INTERVAL '5 minutes'
+		            WHEN (
+		                (t.recorded_at IS NOT NULL AND t.recorded_at >= NOW() AT TIME ZONE 'UTC' - INTERVAL '5 minutes')
+		                OR (w.connected_at IS NOT NULL AND w.connected_at >= NOW() AT TIME ZONE 'UTC' - INTERVAL '5 minutes')
+		            )
 		            THEN 'online'
 		            ELSE 'offline'
 		        END AS status
@@ -958,6 +961,15 @@ func (store *PostgresStore) ListDevices() ([]models.DeviceListItem, error) {
 		     ORDER BY recorded_at DESC
 		     LIMIT 1
 		 ) t ON TRUE
+		 LEFT JOIN LATERAL (
+		     SELECT connected_at
+		     FROM webrtc_connections
+		     WHERE device_id = d.id
+		       AND role = 'publisher'
+		       AND status = 'active'
+		     ORDER BY connected_at DESC
+		     LIMIT 1
+		 ) w ON TRUE
 		 ORDER BY d.device_name ASC, d.mac_address ASC`,
 	)
 	if err != nil {

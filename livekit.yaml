@@ -2,9 +2,11 @@ port: 7880
 
 rtc:
   tcp_port: 7881
+  # Small range: mapping thousands of UDP ports hangs docker-proxy on this VPS.
   port_range_start: 50000
-  port_range_end: 60000
-  use_external_ip: false
+  port_range_end: 50050
+  use_external_ip: true
+  node_ip: 2.144.27.74
 
 keys:
   devkey: secret

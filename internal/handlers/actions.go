@@ -46,6 +46,9 @@ func (handler *ActionsHandler) CreateAction(context *gin.Context) {
 func (handler *ActionsHandler) GetPendingActions(context *gin.Context) {
 	deviceID := context.Query("device-id")
 	if deviceID == "" {
+		deviceID = context.Query("device_id")
+	}
+	if deviceID == "" {
 		context.JSON(http.StatusBadRequest, models.ErrorResponse{Error: "device-id query parameter is required"})
 		return
 	}

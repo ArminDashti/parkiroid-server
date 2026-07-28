@@ -35,6 +35,11 @@ services:
       - "7880"
       - "7881"
       - "7882"
+    # Media must hit the host directly; HAProxy only terminates signaling on 443.
+    # Keep UDP publish range small — large ranges hang docker-proxy on this host.
+    ports:
+      - "7881:7881"
+      - "50000-50050:50000-50050/udp"
 
   dogan-api:
     build:
