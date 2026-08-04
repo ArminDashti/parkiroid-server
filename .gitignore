@@ -12,3 +12,4 @@ bin/dogan-server.exe
 bin/dogan-server.exe bin/parkiroid-server.exe
 bin/parkiroid-server.exe
 # --- end auto ---
+# --- auto: large files (>5MB) ---
